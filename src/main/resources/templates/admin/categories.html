@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('类别管理')}"></head>
+<body>
+<header th:replace="~{layout :: nav}"></header>
+<main>
+  <h1>类别管理</h1>
+  <div th:replace="~{layout :: flash}"></div>
+  <h2>新增类别</h2>
+  <form method="post" th:action="@{/admin/categories}" novalidate class="inline">
+    <input type="text" name="name" th:value="${newName}" data-testid="category-new-name">
+    <button type="submit" data-testid="category-create">新增</button>
+  </form>
+  <p th:if="${errors != null and errors['name'] != null}" class="field-error" data-testid="field-error-name" th:text="${errors['name']}"></p>
+  <h2>类别列表</h2>
+  <table class="grid">
+    <thead><tr><th>名称</th><th>状态</th><th>操作</th></tr></thead>
+    <tbody>
+    <tr th:each="c : ${categories}" data-testid="category-row" th:attr="data-category-id=${c.id()},data-category-name=${c.name()}">
+      <td data-testid="category-row-name" th:text="${c.label()}">类别</td>
+      <td th:text="${c.active()} ? '有效' : '已移除'">有效</td>
+      <td>
+        <th:block th:if="${c.active()}">
+          <form method="post" th:action="@{/admin/categories/{id}/rename(id=${c.id()})}" novalidate class="inline">
+            <input type="text" name="name" th:value="${c.name()}" data-testid="category-rename-input">
+            <button type="submit" data-testid="category-rename">改名</button>
+          </form>
+          <form method="post" th:action="@{/admin/categories/{id}/remove(id=${c.id()})}" class="inline">
+            <button type="submit" data-testid="category-remove">移除</button>
+          </form>
+        </th:block>
+      </td>
+    </tr>
+    </tbody>
+  </table>
+</main>
+</body>
+</html>

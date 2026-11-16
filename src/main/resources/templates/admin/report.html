@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('周报表')}"></head>
+<body>
+<header th:replace="~{layout :: nav}"></header>
+<main>
+  <h1>周报表</h1>
+  <p>统计周期：<span data-testid="report-week" th:text="${report.week.label()}">周</span></p>
+
+  <h2>每个类别的工单数量（本周提交）</h2>
+  <table class="grid">
+    <thead><tr><th>类别</th><th>工单数量</th></tr></thead>
+    <tbody>
+    <tr th:each="c : ${report.categories}" data-testid="report-category-row" th:attr="data-category-id=${c.categoryId()},data-category-name=${c.name()}">
+      <td data-testid="report-category-name" th:text="${c.label()}">类别</td>
+      <td data-testid="report-count" th:text="${c.count()}">0</td>
+    </tr>
+    </tbody>
+  </table>
+
+  <h2>平均处理时长（提交 → 首次标记为已解决）</h2>
+  <p data-testid="report-avg" th:attr="data-avg-seconds=${report.averageSecondsAttr()}" th:text="${report.averageDisplay()}">无数据</p>
+
+  <h2>每位 IT 同事处理的工单数（本周首次解决）</h2>
+  <table class="grid">
+    <thead><tr><th>处理人</th><th>工单数</th></tr></thead>
+    <tbody>
+    <tr th:each="s : ${report.staff}" data-testid="report-staff-row" th:attr="data-user-id=${s.userId()},data-display-name=${s.displayName()}">
+      <td data-testid="report-staff-name" th:text="${s.displayName()}">姓名</td>
+      <td data-testid="report-count" th:text="${s.count()}">0</td>
+    </tr>
+    <tr data-testid="report-unassigned">
+      <td>未分配</td>
+      <td data-testid="report-count" th:text="${report.unassignedResolved()}">0</td>
+    </tr>
+    </tbody>
+  </table>
+
+  <h2>超过 3 天未解决的工单数</h2>
+  <p>待处理或处理中、且自提交起超过 72 小时：<strong data-testid="report-backlog" th:text="${report.backlog()}">0</strong></p>
+</main>
+</body>
+</html>

@@ -1,0 +1,17 @@
+{
+  "name": "helpdesk-e2e",
+  "version": "1.0.0",
+  "private": true,
+  "description": "内部 IT 工单系统开发者功能测试（Playwright + 真实 ticket-db dev 实例）",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@azure/identity": "4.14.1",
+    "@playwright/test": "1.65.1",
+    "@types/node": "^22.0.0",
+    "@types/pg": "8.23.1",
+    "bcryptjs": "3.0.3",
+    "pg": "8.23.1"
+  }
+}

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('工单 #' + ${ticket.id})}"></head>
+<body>
+<header th:replace="~{layout :: nav}"></header>
+<main>
+  <h1><span data-testid="ticket-id" th:text="'#' + ${ticket.id}">#1</span> <span data-testid="detail-title" th:text="${ticket.title}">标题</span></h1>
+  <div th:replace="~{layout :: flash}"></div>
+  <dl class="info">
+    <dt>状态</dt><dd data-testid="ticket-status" th:text="${ticket.status.label}">待处理</dd>
+    <dt>处理人</dt><dd data-testid="ticket-assignee" th:text="${ticket.assigneeLabel()}">未分配</dd>
+    <dt>类别</dt><dd data-testid="detail-category" th:text="${ticket.categoryLabel()}">类别</dd>
+    <dt>紧急程度</dt><dd data-testid="detail-urgency" th:text="${ticket.urgency.label}">中</dd>
+    <dt>提交人</dt><dd data-testid="detail-submitter" th:text="${ticket.submitterName}">提交人</dd>
+    <dt>提交时间</dt><dd data-testid="detail-submitted" th:text="${@timeFormat.format(ticket.submittedAt)}">时间</dd>
+  </dl>
+  <h2>问题描述</h2>
+  <p class="pre" data-testid="detail-description" th:text="${ticket.description}">描述</p>
+
+  <section th:if="${currentUser != null and currentUser.itStaff}" class="actions" data-testid="staff-actions">
+    <h2>处理</h2>
+    <form method="post" th:action="@{/tickets/{id}/claim(id=${ticket.id})}" class="inline">
+      <button type="submit" data-testid="claim-button">认领</button>
+    </form>
+    <form method="post" th:action="@{/tickets/{id}/assign(id=${ticket.id})}" class="inline">
+      <select name="assigneeId" data-testid="assign-select">
+        <option value="">选择 IT 同事</option>
+        <option th:each="u : ${assignable}" th:value="${u.id}" th:text="${u.displayName}">IT 同事</option>
+      </select>
+      <button type="submit" data-testid="assign-submit">分派</button>
+    </form>
+    <form method="post" th:action="@{/tickets/{id}/status(id=${ticket.id})}" class="inline">
+      <select name="status" data-testid="status-select">
+        <option th:each="s : ${statuses}" th:value="${s.name()}" th:text="${s.label}"
+                th:selected="${ticket.status == s}">状态</option>
+      </select>
+      <button type="submit" data-testid="status-submit">修改状态</button>
+    </form>
+  </section>
+
+  <h2>沟通记录</h2>
+  <ol class="records" data-testid="comment-list">
+    <li th:each="c : ${detail.comments}" data-testid="comment-item">
+      <div class="meta">
+        <span data-testid="comment-author" th:text="${c.authorName}">作者</span>
+        （<span data-testid="comment-role" th:text="${c.authorRole.label}">员工</span>）
+        <span data-testid="comment-time" th:text="${@timeFormat.format(c.createdAt)}">时间</span>
+      </div>
+      <p class="pre" data-testid="comment-text" th:text="${c.body}">内容</p>
+    </li>
+  </ol>
+  <p th:if="${#lists.isEmpty(detail.comments)}" class="empty">暂无沟通记录</p>
+  <form method="post" th:action="@{/tickets/{id}/comments(id=${ticket.id})}" novalidate class="stack">
+    <label th:text="${currentUser != null and currentUser.itStaff} ? '回复' : '补充说明'">补充说明</label>
+    <textarea name="body" rows="4" data-testid="comment-body" th:text="${commentBody}"></textarea>
+    <span th:if="${commentErrors != null and commentErrors['body'] != null}" class="field-error" data-testid="field-error-body" th:text="${commentErrors['body']}"></span>
+    <button type="submit" data-testid="comment-submit" th:text="${currentUser != null and currentUser.itStaff} ? '回复' : '添加补充说明'">提交</button>
+  </form>
+
+  <h2>处理记录</h2>
+  <ol class="records" data-testid="event-list">
+    <li th:each="e : ${detail.events}" data-testid="event-item" th:attr="data-event-type=${e.eventType.name()}">
+      <span data-testid="event-time" th:text="${@timeFormat.format(e.createdAt)}">时间</span>
+      <span data-testid="event-actor" th:text="${e.actorName}">操作人</span>
+      <span data-testid="event-type" th:text="${e.eventType.label}">认领</span>：
+      <span th:text="${e.fieldLabel()}">处理人</span>
+      <span data-testid="event-from" th:text="${e.fromValue()}">前值</span> →
+      <span data-testid="event-to" th:text="${e.toValue()}">后值</span>
+    </li>
+  </ol>
+  <p th:if="${#lists.isEmpty(detail.events)}" class="empty">暂无处理记录</p>
+</main>
+</body>
+</html>

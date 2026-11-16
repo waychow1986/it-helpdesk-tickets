@@ -1,0 +1,485 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0026-b01",
+  "stage": "coding",
+  "outcome": "passed",
+  "summary": "已按批准的 spec、design 与任务计划完成 T001～T060：Java 21 + Spring Boot 3.5 工单系统、Dockerfile、deployment.json 与功能测试脚本；在 Agent Pod 中按候选验证顺序从零执行，静态检查、构建、74 个单元测试、40 个连接真实 ticket-db dev 实例的集成测试与 IQA-001～IQA-014 浏览器功能测试全部通过。",
+  "artifacts": [
+    {
+      "path": ".ai-delivery/features/001-v1/reports/implementation.md"
+    },
+    {
+      "path": ".ai-delivery/features/001-v1/runtime/deployment.json"
+    },
+    {
+      "path": ".ai-delivery/features/001-v1/runtime/developer-functional-run.sh"
+    },
+    {
+      "path": ".ai-delivery/features/001-v1/tasks-implementation.md"
+    },
+    {
+      "path": ".dockerignore"
+    },
+    {
+      "path": ".gitignore"
+    },
+    {
+      "path": "Dockerfile"
+    },
+    {
+      "path": "config/checkstyle/checkstyle.xml"
+    },
+    {
+      "path": "e2e/package-lock.json"
+    },
+    {
+      "path": "e2e/package.json"
+    },
+    {
+      "path": "e2e/playwright.config.ts"
+    },
+    {
+      "path": "e2e/support/cleanup.teardown.ts"
+    },
+    {
+      "path": "e2e/support/db.ts"
+    },
+    {
+      "path": "e2e/support/fixtures.ts"
+    },
+    {
+      "path": "e2e/support/seed.setup.ts"
+    },
+    {
+      "path": "e2e/tests/iqa-001-accounts.spec.ts"
+    },
+    {
+      "path": "e2e/tests/iqa-002-submit-ticket.spec.ts"
+    },
+    {
+      "path": "e2e/tests/iqa-003-employee-isolation.spec.ts"
+    },
+    {
+      "path": "e2e/tests/iqa-004-comments.spec.ts"
+    },
+    {
+      "path": "e2e/tests/iqa-005-claim-assign.spec.ts"
+    },
+    {
+      "path": "e2e/tests/iqa-006-status.spec.ts"
+    },
+    {
+      "path": "e2e/tests/iqa-007-employee-no-actions.spec.ts"
+    },
+    {
+      "path": "e2e/tests/iqa-008-categories.spec.ts"
+    },
+    {
+      "path": "e2e/tests/iqa-009-it-staff-role.spec.ts"
+    },
+    {
+      "path": "e2e/tests/iqa-010-admin-access-control.spec.ts"
+    },
+    {
+      "path": "e2e/tests/iqa-011-keyword-search.spec.ts"
+    },
+    {
+      "path": "e2e/tests/iqa-012-filters.spec.ts"
+    },
+    {
+      "path": "e2e/tests/iqa-013-weekly-report.spec.ts"
+    },
+    {
+      "path": "e2e/tests/iqa-014-backlog.spec.ts"
+    },
+    {
+      "path": "pom.xml"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/HelpdeskApplication.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/auth/AppUserDetailsService.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/auth/CurrentUser.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/auth/HomeController.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/auth/LoginController.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/auth/RoleRefreshFilter.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/category/Category.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/category/CategoryAdminController.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/category/CategoryRepository.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/category/CategoryService.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/config/AppProperties.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/config/ClockConfig.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/config/SecurityConfig.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/config/TransactionConfig.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/config/WebMvcConfig.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/platform/CandidateIdentityController.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/report/ReportController.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/report/WeekRange.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/report/WeeklyReport.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/report/WeeklyReportRepository.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/report/WeeklyReportService.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/ticket/CommentForm.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/ticket/EventType.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/ticket/Ticket.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/ticket/TicketCommandService.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/ticket/TicketComment.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/ticket/TicketCommentRepository.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/ticket/TicketController.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/ticket/TicketDetail.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/ticket/TicketEvent.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/ticket/TicketEventRepository.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/ticket/TicketForm.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/ticket/TicketPage.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/ticket/TicketQueryService.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/ticket/TicketRepository.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/ticket/TicketSearchCriteria.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/ticket/TicketStatus.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/ticket/Urgency.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/user/AppUser.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/user/BootstrapProperties.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/user/InitialAdminBootstrap.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/user/Role.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/user/UserAdminController.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/user/UserAdminService.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/user/UserForm.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/user/UserRepository.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/web/AccessDeniedException.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/web/BadRequestException.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/web/GlobalExceptionHandler.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/web/NotFoundException.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/web/RequestLogFilter.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/web/TimeFormat.java"
+    },
+    {
+      "path": "src/main/java/com/ithelpdesk/web/ValidationException.java"
+    },
+    {
+      "path": "src/main/resources/application.yml"
+    },
+    {
+      "path": "src/main/resources/db/migration/V1__init.sql"
+    },
+    {
+      "path": "src/main/resources/static/css/app.css"
+    },
+    {
+      "path": "src/main/resources/templates/admin/categories.html"
+    },
+    {
+      "path": "src/main/resources/templates/admin/report.html"
+    },
+    {
+      "path": "src/main/resources/templates/admin/users.html"
+    },
+    {
+      "path": "src/main/resources/templates/error/400.html"
+    },
+    {
+      "path": "src/main/resources/templates/error/403.html"
+    },
+    {
+      "path": "src/main/resources/templates/error/404.html"
+    },
+    {
+      "path": "src/main/resources/templates/error/500.html"
+    },
+    {
+      "path": "src/main/resources/templates/layout.html"
+    },
+    {
+      "path": "src/main/resources/templates/login.html"
+    },
+    {
+      "path": "src/main/resources/templates/tickets/detail.html"
+    },
+    {
+      "path": "src/main/resources/templates/tickets/list.html"
+    },
+    {
+      "path": "src/main/resources/templates/tickets/new.html"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/DataRetentionIT.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/MigrationIT.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/MigrationPolicyTest.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/auth/AppUserDetailsServiceTest.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/auth/RoleRefreshFilterTest.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/auth/SecurityConfigTest.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/category/CategoryIT.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/category/CategoryServiceTest.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/platform/CandidateIdentityControllerTest.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/report/WeekRangeTest.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/report/WeeklyReportIT.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/report/WeeklyReportTest.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/support/IntegrationTestBase.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/support/LogCapture.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/support/MutableClock.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/support/RunPrefix.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/support/TestClockConfig.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/support/TestData.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/support/TicketSamples.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/support/WebSliceTestBase.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/support/WebSliceTestConfig.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/ticket/TicketAccessIT.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/ticket/TicketActionAuthorizationTest.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/ticket/TicketAssignmentIT.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/ticket/TicketControllerTest.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/ticket/TicketFormValidationTest.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/ticket/TicketNewPageTest.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/ticket/TicketSearchCriteriaTest.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/ticket/TicketSearchIT.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/ticket/TicketStatusIT.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/ticket/TicketSubmitIT.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/user/InitialAdminBootstrapIT.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/user/InitialAdminBootstrapTest.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/user/UserAdminIT.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/user/UserAdminServiceTest.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/user/UserRoleChangeIT.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/web/GlobalExceptionHandlerTest.java"
+    },
+    {
+      "path": "src/test/java/com/ithelpdesk/web/RequestLogFilterTest.java"
+    },
+    {
+      "path": "src/test/resources/application-it.yml"
+    }
+  ],
+  "progress": {
+    "completedTaskIds": [
+      "T001",
+      "T002",
+      "T003",
+      "T004",
+      "T005",
+      "T006",
+      "T007",
+      "T008",
+      "T009",
+      "T010",
+      "T011",
+      "T012",
+      "T013",
+      "T014",
+      "T015",
+      "T016",
+      "T017",
+      "T018",
+      "T019",
+      "T020",
+      "T021",
+      "T022",
+      "T023",
+      "T024",
+      "T025",
+      "T026",
+      "T027",
+      "T028",
+      "T029",
+      "T030",
+      "T031",
+      "T032",
+      "T033",
+      "T034",
+      "T035",
+      "T036",
+      "T037",
+      "T038",
+      "T039",
+      "T040",
+      "T041",
+      "T042",
+      "T043",
+      "T044",
+      "T045",
+      "T046",
+      "T047",
+      "T048",
+      "T049",
+      "T050",
+      "T051",
+      "T052",
+      "T053",
+      "T054",
+      "T055",
+      "T056",
+      "T057",
+      "T058",
+      "T059",
+      "T060"
+    ],
+    "blockedTaskIds": []
+  }
+}

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head th:fragment="head(title)">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title th:text="${title} + ' · IT 工单系统'">IT 工单系统</title>
+  <link rel="stylesheet" th:href="@{/css/app.css}">
+</head>
+<body>
+<header th:fragment="nav" class="topbar">
+  <span class="brand">IT 工单系统</span>
+  <nav th:if="${currentUser != null}">
+    <th:block th:if="${currentUser.employee}">
+      <a data-testid="nav-my-tickets" th:href="@{/tickets}">我的工单</a>
+      <a data-testid="nav-new-ticket" th:href="@{/tickets/new}">提交工单</a>
+    </th:block>
+    <th:block th:if="${currentUser.itStaff}">
+      <a data-testid="nav-all-tickets" th:href="@{/tickets}">全部工单</a>
+    </th:block>
+    <th:block th:if="${currentUser.admin}">
+      <a data-testid="nav-admin-users" th:href="@{/admin/users}">账号管理</a>
+      <a data-testid="nav-admin-categories" th:href="@{/admin/categories}">类别管理</a>
+      <a data-testid="nav-report" th:href="@{/admin/reports/weekly}">周报表</a>
+    </th:block>
+  </nav>
+  <span th:if="${currentUser != null}" class="whoami">
+    <span data-testid="current-user" th:text="${currentUser.displayName} + '（' + ${currentUser.role.label} + '）'">用户</span>
+    <form class="inline" method="post" th:action="@{/logout}">
+      <button type="submit" data-testid="logout">退出</button>
+    </form>
+  </span>
+</header>
+<div th:fragment="flash">
+  <p th:if="${flash != null}" class="flash ok" data-testid="flash" th:text="${flash}">提示</p>
+  <p th:if="${flashError != null}" class="flash err" data-testid="flash" th:text="${flashError}">错误</p>
+</div>
+</body>
+</html>

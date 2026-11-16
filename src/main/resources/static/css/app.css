@@ -1,0 +1,36 @@
+* { box-sizing: border-box; }
+body { margin: 0; font-family: system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; color: #1f2933; background: #f7f8fa; }
+.topbar { display: flex; align-items: center; gap: 1.5rem; padding: .75rem 1.5rem; background: #1f3a5f; color: #fff; }
+.topbar a { color: #fff; margin-right: 1rem; text-decoration: none; }
+.topbar a:hover { text-decoration: underline; }
+.brand { font-weight: 600; }
+.whoami { margin-left: auto; display: flex; gap: .75rem; align-items: center; }
+main { padding: 1.5rem; max-width: 1200px; margin: 0 auto; }
+main.narrow { max-width: 420px; }
+h1 { font-size: 1.5rem; }
+h2 { font-size: 1.15rem; margin-top: 1.5rem; }
+form.inline { display: inline-flex; gap: .5rem; align-items: center; margin: 0 .5rem .5rem 0; }
+form.stack { display: flex; flex-direction: column; gap: .5rem; max-width: 640px; }
+form.stack label { display: flex; flex-direction: column; gap: .25rem; }
+.filters { display: flex; flex-wrap: wrap; gap: .75rem; align-items: flex-end; margin-bottom: 1rem; }
+.filters label { display: flex; flex-direction: column; gap: .25rem; font-size: .9rem; }
+input, select, textarea, button { font: inherit; padding: .35rem .5rem; }
+button { cursor: pointer; }
+.grid { border-collapse: collapse; width: 100%; background: #fff; }
+.grid th, .grid td { border: 1px solid #d9dee5; padding: .4rem .6rem; text-align: left; vertical-align: top; }
+.grid th { background: #eef1f5; }
+.flash { padding: .5rem .75rem; border-radius: 4px; }
+.flash.ok { background: #e3f4e8; color: #17603a; }
+.flash.err { background: #fde8e8; color: #9b1c1c; }
+.field-error { color: #9b1c1c; font-size: .9rem; }
+.empty { color: #52606d; }
+.hint { color: #52606d; font-size: .9rem; }
+.pre { white-space: pre-wrap; word-break: break-word; }
+.info { display: grid; grid-template-columns: max-content 1fr; gap: .25rem 1rem; }
+.info dt { color: #52606d; }
+.info dd { margin: 0; }
+.records { padding-left: 1.25rem; }
+.records li { margin-bottom: .75rem; }
+.meta { color: #52606d; font-size: .9rem; }
+.actions { background: #fff; border: 1px solid #d9dee5; padding: .75rem 1rem; }
+.pager { margin-top: 1rem; display: flex; gap: 1rem; }
