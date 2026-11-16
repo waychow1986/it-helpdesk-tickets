@@ -209,3 +209,76 @@
 ### 实施结论
 
 部分完成：本次只完成了排查和记录，没有修复任何问题。在 Agent Pod 中，构建、静态检查、74 个单元测试和功能脚本语法检查都通过；可执行 jar 连接真实 `ticket-db` dev 实例，并在模拟容器条件（无 HOME、未解析的 `user.home`、单核、受限堆）下约 6～8 秒就绪；健康端点和候选身份端点的行为符合部署契约。候选健康检查的连接超时无法在 Pod 中复现，现有证据指向网关、网络层，而不是应用代码。因此本次没有修改代码、`Dockerfile` 或 `deployment.json`。候选环境是否可达要等平台重新部署后确认，本次不声称候选环境已通过。
+
+## Coding Session NR-DLV-20261116-72F2B9041E74-0035-b01
+
+### 实施范围
+
+- 模式：`coding-repair`，第 1 批。处理两条机器反馈（非人工决定）：
+  1. 平台执行结果（test-environment，NR-DLV-20261116-72F2B9041E74-0034:0）：候选重新部署后，请求 `https://cand-72f2b9041e74.eastus2.cloudapp.azure.com/actuator/health` 仍报 `HttpConnectTimeoutException: HTTP connect timed out`。这是同一主机名第二次出现这个错误（第一次是 NR-DLV-20261116-72F2B9041E74-0030）。
+  2. upstream-change：自基线 `5b07ffd945d1` 起修改了 `reports/convergence.md`。新增章节「本轮新增 Session（NR-DLV-20261116-72F2B9041E74-0031-b01）复核」，结论仍为“通过”，没有 findings。其中一条非阻塞观察指出，上一 Session「实施结论」写“部分完成”，而结果文件 `outcome` 为 `passed`，建议统一措辞。本 Session 的处理方式：本段「实施结论」与结果文件 `outcome` 使用一致的说法。早先 Session 的记录按账本规则保持不变。
+- 本次只做根因定位和回归确认，不改动已批准的产品行为或技术决定，不追加任务。
+
+### 完成与受阻任务
+
+- 本次没有新勾选的任务：T001～T060 在早先 Session 已全部勾选，`progress.completedTaskIds` 为空。
+- 受阻任务：无（所有实现任务都已完成）。候选部署后的健康检查受阻于平台网关的 HTTPS 入口，需要运维处理，见结果文件 `inputsNeeded`（`suggestedProvider`=operator）。
+- 新定位到的根因证据：候选主机名的 **80 端口可以建立 TCP 连接**，网关返回 `HTTP/1.1 301 Moved Permanently` 并跳转到 `https://…`；**443 端口的 TCP 连接超时**，既没有被拒绝，也没有完成 TLS 握手。同一 Pod 访问其他公网 HTTPS 站点的 443 端口正常。所以失败点是网关或负载均衡上 443 的监听、规则或证书没有就绪，请求根本没有到达候选容器。应用、`Dockerfile` 和 `deployment.json` 都无法影响这一层。
+
+### 变更文件
+
+| 路径 | 变更 | 来源任务 |
+|---|---|---|
+| `.ai-delivery/features/001-v1/reports/implementation.md` | 在末尾追加本 Session 记录（端口级定位证据、回归命令与结论），早先内容未改写 | 修复反馈（候选健康检查连接超时） |
+| `.ai-delivery/features/001-v1/.state/results/NR-DLV-20261116-72F2B9041E74-0035-b01.json` | 新增本次结果文件 | 修复反馈 |
+
+### 需求与场景覆盖
+
+| 来源（FR / AC / IQA） | 实现路径 | 测试路径 | 结果 |
+|---|---|---|---|
+| 部署契约 `healthPath` `/actuator/health`（design“部署契约”） | `src/main/resources/application.yml`、`src/main/java/com/ithelpdesk/config/SecurityConfig.java` | 本次 localhost 启动探测 | 通过：可执行 jar 启动约 6 秒后返回 `200 {"status":"UP","groups":["liveness","readiness"]}` |
+| 候选身份端点 `/api/candidate-identity` | `src/main/java/com/ithelpdesk/platform/CandidateIdentityController.java` | 本次 localhost 探测 | 通过：原样返回注入的测试值 `{"deliveryId":"DLV-test","candidateSha":"sha-test"}` |
+| FR-029、FR-030、NFR-001（启动迁移与初始管理员引导） | `src/main/resources/db/migration/V1__init.sql`、`src/main/java/com/ithelpdesk/user/InitialAdminBootstrap.java` | 本次 localhost 启动（真实 `ticket-db` dev 实例） | 通过：`Successfully validated 1 migration`，启动无 ERROR 日志 |
+| 全部 FR / IQA-001～IQA-014 | 未改动 | `mvn -B -ntp test`（74 个单元 / 切片测试） | 通过（回归确认，代码未改动） |
+
+### 执行命令与结果
+
+| 命令 | 环境 | 依赖实例（真实 / 替身） | 结果 | 证据 |
+|---|---|---|---|---|
+| `getent hosts cand-72f2b9041e74.eastus2.cloudapp.azure.com` | Agent Pod | 不涉及 | 通过 | 解析到 `57.165.12.113`，与上一 Session 相同 |
+| `curl -m 15 https://cand-72f2b9041e74.eastus2.cloudapp.azure.com/actuator/health` | Agent Pod | 不涉及 | 失败（复现平台现象） | `curl: (28) Connection timed out after 15002 milliseconds` |
+| `curl -m 15 -i http://cand-72f2b9041e74.eastus2.cloudapp.azure.com/actuator/health` | Agent Pod | 不涉及 | 网关在 80 端口响应 | `HTTP/1.1 301 Moved Permanently`，`location: https://cand-72f2b9041e74.eastus2.cloudapp.azure.com/actuator/health` |
+| `curl -m 15 -i http://cand-72f2b9041e74.eastus2.cloudapp.azure.com/.well-known/acme-challenge/test` | Agent Pod | 不涉及 | 同样返回 301 跳转到 HTTPS | 说明 80 端口上的请求都由网关的 HTTP→HTTPS 跳转规则处理 |
+| `timeout 10 bash -c 'echo > /dev/tcp/57.165.12.113/443'` 与 `/dev/tcp/57.165.12.113/80` | Agent Pod | 不涉及 | 443 未连通；80 连通 | 443 端口 TCP 连接超时，80 端口立即建立连接 |
+| `curl https://www.microsoft.com`、`curl https://portal.azure.com` | Agent Pod | 不涉及 | 对照：能连通 | 分别返回 200、403。说明 Pod 出站的 443 端口没有被普遍阻断 |
+| `mvn -B -ntp -q -DskipTests package` | Agent Pod | 不涉及 | 通过 | 生成 `target/helpdesk.jar`（53 MB） |
+| `AIDELIVERY_DELIVERY_ID=DLV-test AIDELIVERY_CANDIDATE_SHA=sha-test java -XX:MaxRAMPercentage=75 -XX:ActiveProcessorCount=1 -jar target/helpdesk.jar`，再轮询 `/actuator/health`、`/api/candidate-identity` | Agent Pod localhost:8080 | 真实 `ticket-db` dev 实例（Pod 工作负载身份，Entra 令牌） | 通过 | `Started HelpdeskApplication in 5.932 seconds`；第 8 次轮询时 health 返回 200 UP；身份端点返回注入值 |
+| `mvn -B -ntp checkstyle:check` | Agent Pod | 不涉及 | 通过 | `You have 0 Checkstyle violations.` |
+| `mvn -B -ntp test` | Agent Pod | 不涉及（单元 / 切片测试，Mockito 替身只用于切片测试，不作为 functional 证据） | 通过 | `Tests run: 74, Failures: 0, Errors: 0, Skipped: 0` |
+| `bash -n .ai-delivery/features/001-v1/runtime/developer-functional-run.sh` | Agent Pod | 不涉及 | 通过 | 语法检查通过 |
+
+本次没有重复运行集成测试和功能测试：代码与测试都没有改动，第一个 Session 已用真实 `ticket-db` dev 实例运行并通过，Convergence 两轮复核也确认这些证据仍然有效。本次启动探测使用真实 dev 实例，没有使用数据库替身。
+
+### Runtime 与下游门禁就绪制品
+
+- `Dockerfile`：未改动。多阶段构建，运行阶段 `eclipse-temurin:21-jre`，`USER 10001`，`EXPOSE 8080`，容器监听 HTTP 8080，TLS 按画像由网关终止。
+- `runtime/deployment.json`：未改动。`containerPort` 8080、`healthPath` `/actuator/health`、`candidateIdentityPath` `/api/candidate-identity`、`requiresPrivateNetwork` false，验证命令按类别组织。
+- Candidate identity endpoint：未改动。本次在 localhost 再次验证，它原样返回注入值，没有虚构的回退值。
+- `runtime/developer-functional-run.sh`：未改动，`bash -n` 通过。
+
+### 延后平台证据
+
+- 平台网关为 `cand-72f2b9041e74.eastus2.cloudapp.azure.com` 提供的 HTTPS（443）监听、负载均衡规则和 Let's Encrypt 证书状态，只有平台和运维能查看与修复。
+- 网关 443 恢复后，候选重新部署后 `/actuator/health` 与 `/api/candidate-identity` 在 HTTPS 主机名上的返回值，以及候选容器日志（Flyway、`ticket-db` test 实例连接）。
+- 镜像构建（ACR Tasks）、Independent QA（IQA-001～IQA-015）、UAT、审批与合并。
+
+### 剩余风险
+
+- 根因定位：同一网关 IP `57.165.12.113` 在 80 端口有响应（301 跳转到 HTTPS），443 端口的 TCP 连接超时。所以平台探测失败发生在网关或负载均衡的 443 入口，与应用是否就绪无关：后端没有就绪时，网关应当完成 TLS 并返回 5xx，而不是让 TCP 连接超时。可能的原因包括：网关 HTTPS 监听器没有生效（例如证书尚未签发，或签发失败导致 listener 未就绪），以及负载均衡或 NSG 没有放行 443。具体是哪一项需要平台查看 Gateway、Certificate 和 LB 的状态，Agent Pod 无法确认。
+- 80 端口上 `/.well-known/acme-challenge/*` 也被跳转到 HTTPS。如果证书使用 HTTP-01 验证，这可能导致证书一直无法签发，进而导致 443 监听不可用。这是一个推测，需要平台核实。
+- 已经连续两次重新部署失败，现象相同。如果不经运维处理就再次部署，大概率仍然失败，所以本次请求运维介入，而不是再次直接提交 `passed`。
+- 应用侧的潜在风险（出站到 Entra 受限、`/tmp` 不可写、内存上限低于约 384 MiB）在上一 Session 已经列出。目前没有平台证据支持其中任何一项，因此本次没有为这些假设修改已批准的 JVM 参数或运行时契约。
+
+### 实施结论
+
+需要运维输入：实现任务 T001～T060 都已完成，本次没有修改代码。构建、静态检查、74 个单元测试和功能脚本语法检查都通过；应用连接真实 `ticket-db` dev 实例约 6 秒就绪，健康端点和候选身份端点符合部署契约。候选健康检查失败的根因已经定位到平台网关：80 端口有响应，443 端口的 TCP 连接超时。应用侧没有可以修复的问题，需要运维修复网关的 HTTPS 入口后重新部署。本次不声称候选环境已通过。

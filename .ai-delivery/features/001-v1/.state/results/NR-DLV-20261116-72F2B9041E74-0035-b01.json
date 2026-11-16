@@ -1,0 +1,23 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0035-b01",
+  "stage": "coding",
+  "outcome": "needs_input",
+  "summary": "候选健康检查连接超时已定位到平台网关：候选主机名的 80 端口返回 301，443 端口 TCP 连接超时，应用在 localhost 连接真实 dev 库约 6 秒就绪；应用侧无可修复问题，需要运维修复网关 HTTPS 入口后重新部署。upstream-change 已处理：按 convergence.md 非阻塞观察统一了本 Session 实施结论与 outcome 的措辞，未改写早先记录。",
+  "artifacts": [
+    { "path": ".ai-delivery/features/001-v1/reports/implementation.md" }
+  ],
+  "progress": {
+    "completedTaskIds": [],
+    "blockedTaskIds": []
+  },
+  "inputsNeeded": [
+    {
+      "id": "IN-OPS-001",
+      "description": "请运维检查并修复候选网关对 cand-72f2b9041e74.eastus2.cloudapp.azure.com 的 HTTPS 入口：Gateway 443 listener 状态、Let's Encrypt 证书签发状态（80 端口上 /.well-known/acme-challenge/* 也被 301 跳转到 HTTPS，如果使用 HTTP-01 验证，可能因此无法签发证书）、负载均衡和 NSG 的 443 规则。修复后重新部署候选，并在仍失败时提供候选 Pod 事件和容器日志。",
+      "why": "从 Agent Pod 测试同一网关 IP 57.165.12.113：80 端口立即返回 HTTP 301，443 端口 TCP 连接超时；同一 Pod 访问其他公网站点的 443 端口正常。失败发生在请求到达容器之前，已连续两次部署（NR-DLV-20261116-72F2B9041E74-0030、NR-DLV-20261116-72F2B9041E74-0034）复现。应用在 localhost 连接真实 ticket-db dev 实例约 6 秒就绪，健康端点返回 200 UP，代码、Dockerfile 和 deployment.json 都无法影响网关 443 入口。",
+      "suggestedProvider": "operator",
+      "affectsTaskIds": []
+    }
+  ]
+}
