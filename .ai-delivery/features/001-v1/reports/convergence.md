@@ -2,15 +2,14 @@
 
 ## 评审范围
 
-- 模式：initial（一次穷尽评审）；nodeRunId `NR-DLV-20261116-72F2B9041E74-0027`。
-- 被评审提交：`94b73d2`（aidh: coding NR-DLV-20261116-72F2B9041E74-0026-b01），Coding 第 1 批，覆盖 T001～T060。
-- 权威制品（只读）：`intent.md`（INT-001～INT-024）、`spec.md`（FR-001～FR-030、NFR-001～NFR-002、IQA-001～IQA-015、AC-001～AC-020）、`design.md`（TD-001～TD-015、表结构、HTTP 路由、统一行为契约、`data-testid` 约定、配置表、部署契约、验证环境责任矩阵）、`technical-baseline.md`（方案 A）、`tasks-implementation.md`、`reports/implementation.md`、`docs/dependencies.json`。
-- 代码与测试：`pom.xml`、`Dockerfile`、`.dockerignore`、`config/checkstyle/`、`src/main/**`（`auth`、`config`、`user`、`category`、`ticket`、`report`、`platform`、`web` 各包与模板）、`src/test/**`（单元 / 切片测试与 12 个 `*IT`）、`e2e/**`（Playwright 配置、`support/`、`tests/iqa-001`～`iqa-014`）、`runtime/deployment.json`、`runtime/developer-functional-run.sh`。
-- 评审维度：制品到实现与测试的可追溯性、实施报告中验证证据与测试代码是否一致、用户可见行为与 spec / Intent 是否一致、架构 / Contract / 运维 / 任务覆盖、未批准的外部依赖、下游就绪制品。
+- 模式：recheck（上一轮门禁记录 `GR-DLV-20261116-72F2B9041E74-0007`）；nodeRunId `NR-DLV-20261116-72F2B9041E74-0032`。上一轮 findings 为空。
+- 本轮基线：`e688e33`（上一轮 Convergence `NR-DLV-20261116-72F2B9041E74-0027`）→ 被评审提交 `5b07ffd`（aidh: coding NR-DLV-20261116-72F2B9041E74-0031-b01，`coding-repair` 第 1 批）。
+- 本轮改动只有两个文件：`reports/implementation.md` 追加了「Coding Session NR-DLV-20261116-72F2B9041E74-0031-b01」一节；新增结果文件 `.state/results/NR-DLV-20261116-72F2B9041E74-0031-b01.json`。代码、测试、`Dockerfile`、`runtime/deployment.json`、`runtime/developer-functional-run.sh`、任务和上游制品都没有改动（`git diff e688e33..5b07ffd --stat` 确认）。
+- 复核重点：新增 Session 记录的排查命令与结论是否与仓库中的 `Dockerfile`、`application.yml`、`deployment.json` 一致；是否有无证据的成功声明；改动对未改内容的一致性影响。未改动、上一轮也没有提出问题的内容沿用上一轮（initial，`NR-DLV-20261116-72F2B9041E74-0027`）的结论，下文保留其记录。
 
 ## 结论
 
-`通过`。本次未发现 critical / high 阻塞问题，结果文件 `findings` 为空，`outcome` 为 `passed`。
+`通过`。上一轮没有 findings；本轮改动只是追加实施报告记录，没有引入新的 critical / high 阻塞问题。结果文件 `findings` 为空，`outcome` 为 `passed`。
 
 ## 阻塞问题
 
@@ -46,6 +45,14 @@
 - 真实依赖与替身边界：集成测试和功能测试都通过 `AIDH_DEP_TICKET_DB_*` 加 Entra 令牌连接真实 `ticket-db` dev 实例，没有使用 H2、Testcontainers 或其他数据库替身。Mockito 替身只出现在单元 / Web 切片测试中，实施报告已注明这些测试不作为 functional 证据。
 - 报告如实记录了两次完整序列，以及第一次运行后修正的问题（`skipTests` 绑定、切片测试打印 Boot 生成的密码）。镜像构建和候选部署被如实标为未执行。
 
+### 本轮新增 Session（NR-DLV-20261116-72F2B9041E74-0031-b01）复核
+
+- 处理对象：平台候选部署后探测 `https://cand-72f2b9041e74.eastus2.cloudapp.azure.com/actuator/health` 报 `HttpConnectTimeoutException`（机器反馈）。Coding 没有修改代码或运行时契约，只追加了排查记录。
+- 记录与仓库一致：报告所述 `Dockerfile` 构建上下文（`pom.xml`、`config`、`src`）、运行阶段 `eclipse-temurin:21-jre`、`USER 10001`、`EXPOSE 8080`、`-XX:MaxRAMPercentage=75`，与仓库中 `Dockerfile` 逐项相符；`application.yml` 的 `server.port: 8080` 未绑定回环地址，与 `deployment.json` 的 `containerPort` 8080、`healthPath`、`candidateIdentityPath` 一致。
+- 回归命令（`checkstyle:check`、`mvn -B -ntp test` 74 个、`bash -n`）与 `deployment.json` 中的命令一致；因代码与测试未改动，未重跑集成和功能测试的说明成立，上一轮复核的集成 / 功能证据仍然有效。
+- 没有无证据的成功声明：报告明确写明连接超时无法在 Agent Pod 中复现、根因判断（网关 / 网络层）未经证实、候选环境可达性属于延后平台证据，没有声称候选环境已通过。localhost 启动探测使用真实 `ticket-db` dev 实例，没有用 health check 代替 functional 证据。
+- 结果文件 `outcome` 为 `passed` 而报告「实施结论」写“部分完成：只完成了排查和记录”，两者措辞不同，但任务 T001～T060 均已完成、无受阻任务，排查结论也如实记录，不构成阻塞（见非阻塞观察）。
+
 ## 用户可见行为比较
 
 - 身份与访问控制：URL 层（`/admin/**` 需 ADMIN；`/tickets/new` 与 `POST /tickets` 需 EMPLOYEE；`claim|assign|status` 需 IT_STAFF；`/tickets/**` 需 EMPLOYEE 或 IT_STAFF）和服务层双重授权都与 design 一致。管理员不能访问工单（A-004）。员工访问他人或不存在的工单统一返回 403（TD-014）。
@@ -71,7 +78,7 @@
 
 - 候选验证：Runner 在不可变候选提交上执行 `deployment.json` 中的命令，并对 `developer-functional-run.sh` 做语法检查。
 - 镜像构建：ACR Tasks 以根目录 `Dockerfile` 构建，镜像用户解析为 UID 10001（Agent Pod 无 Docker 守护进程，未在本地构建）。
-- 候选部署：`cand-{deliveryShortId}` 命名空间部署，以及基于 `ticket-db` `test` 实例的 `healthPath` / `candidateIdentityPath` 校验。
+- 候选部署：`cand-{deliveryShortId}` 命名空间部署，以及基于 `ticket-db` `test` 实例的 `healthPath` / `candidateIdentityPath` 校验。上一次候选部署（`NR-DLV-20261116-72F2B9041E74-0030`）的 HTTPS 主机名连接超时尚待平台重新部署确认；候选 Pod 事件与容器日志只有平台可以查看。
 - Independent QA：IQA-001～IQA-015 在已部署候选上的验收，其中 IQA-015 需要平台实际执行一次重新部署或升级。
 - 生产首次投入使用时，运维按 design「支持 Runbook」设置初始管理员的首个凭据；以及 UAT、人工审批、发布与合并。
 
@@ -82,3 +89,5 @@
 - 筛选下拉中的处理人选项（当前 IT 同事以及曾作为处理人的账号）对员工也可见，只暴露 IT 同事姓名，不暴露他人工单内容，与 design「搜索与筛选」一致。
 - HttpSession 存在内存中，单副本运行；重新部署后用户需要重新登录，design 已说明，数据不受影响。
 - 初始管理员在首次启动时创建且没有凭据，投入使用前需运维执行 Runbook，这是已批准的 TD-011 设计。
+- 候选健康检查连接超时（本轮新增）：失败发生在到网关公网地址的 TCP 连接阶段，Coding 在 Pod 中按容器条件（无 HOME、单核、受限堆）启动均在约 6～8 秒就绪，现有证据未指向应用、`Dockerfile` 或 `deployment.json` 的缺陷，Convergence 也未在这些文件中发现与部署契约不符之处。若平台重新部署后容器日志显示应用未就绪（如出站到 Entra 受限、`/tmp` 不可写或内存上限低于约 384 MiB），应作为新的修复反馈处理。
+- 实施报告第二段「实施结论」写“部分完成”，与该 Session 结果文件 `outcome: passed` 措辞不一致；含义是“未修复任何代码问题、仅完成排查”，不影响任务完成状态，建议后续 Session 统一措辞。
