@@ -282,3 +282,65 @@
 ### 实施结论
 
 需要运维输入：实现任务 T001～T060 都已完成，本次没有修改代码。构建、静态检查、74 个单元测试和功能脚本语法检查都通过；应用连接真实 `ticket-db` dev 实例约 6 秒就绪，健康端点和候选身份端点符合部署契约。候选健康检查失败的根因已经定位到平台网关：80 端口有响应，443 端口的 TCP 连接超时。应用侧没有可以修复的问题，需要运维修复网关的 HTTPS 入口后重新部署。本次不声称候选环境已通过。
+
+## Coding Session NR-DLV-20261116-72F2B9041E74-0036-b01
+
+### 实施范围
+
+- 模式：`coding-repair`，第 1 批。处理两条反馈：
+  1. 平台执行结果（机器判断，NR-DLV-20261116-72F2B9041E74-0034:0）：候选 `/actuator/health` 在 HTTPS 主机名上报 `HttpConnectTimeoutException: HTTP connect timed out`。
+  2. 人工审批意见（HT-DLV-20261116-72F2B9041E74-0009，决定 ProvideInput）：平台缺陷已定位并修复。候选入口 Service 的端口只在创建时从共享网关复制一次，而网关当时没有 HTTPS 监听器，因此入口缺少 443。Runner 已更新，要求按原代码重新部署候选，应用侧不需要修改。
+- 这与上一 Session（NR-DLV-20261116-72F2B9041E74-0035-b01）定位的结论一致：80 端口可达，443 端口 TCP 超时。本次按人工意见不修改应用代码、`Dockerfile` 或 `deployment.json`，只做回归确认，然后提交 `passed`，交给平台重新部署。
+
+### 完成与受阻任务
+
+- 本次没有新勾选的任务：T001～T060 在早先 Session 已全部勾选，`progress.completedTaskIds` 为空。
+- 受阻任务：无。上一 Session 的运维输入请求 IN-OPS-001 已由人工审批意见答复（平台缺陷已修复）。
+
+### 变更文件
+
+| 路径 | 变更 | 来源任务 |
+|---|---|---|
+| `.ai-delivery/features/001-v1/reports/implementation.md` | 在末尾追加本 Session 记录，早先内容未改写 | 修复反馈（候选健康检查连接超时，人工确认属于平台缺陷） |
+| `.ai-delivery/features/001-v1/.state/results/NR-DLV-20261116-72F2B9041E74-0036-b01.json` | 新增本次结果文件 | 修复反馈 |
+
+### 需求与场景覆盖
+
+| 来源（FR / AC / IQA） | 实现路径 | 测试路径 | 结果 |
+|---|---|---|---|
+| 部署契约 `healthPath` / `candidateIdentityPath`（design“部署契约”） | `src/main/java/com/ithelpdesk/platform/CandidateIdentityController.java`、`src/main/resources/application.yml` | 上一 Session 在 localhost 连接真实 `ticket-db` dev 实例完成探测 | 未改动；上一 Session 已验证通过（health 返回 200 UP，身份端点原样返回注入值） |
+| 全部 FR / IQA-001～IQA-014 | 未改动 | `mvn -B -ntp test`（74 个单元 / 切片测试） | 通过（回归确认） |
+| 功能脚本契约 | `.ai-delivery/features/001-v1/runtime/developer-functional-run.sh` | `bash -n` | 通过 |
+
+### 执行命令与结果
+
+| 命令 | 环境 | 依赖实例（真实 / 替身） | 结果 | 证据 |
+|---|---|---|---|---|
+| `timeout 10 bash -c 'echo > /dev/tcp/cand-72f2b9041e74.eastus2.cloudapp.azure.com/443'` | Agent Pod | 不涉及 | 仍未连通（预期之中） | 当前部署的候选是在 Runner 修复之前创建的，入口 Service 尚未重新同步端口，要等平台重新部署后才会生效 |
+| `curl -m 15 https://cand-72f2b9041e74.eastus2.cloudapp.azure.com/actuator/health` | Agent Pod | 不涉及 | 超时（同上） | `curl: (28) Connection timed out after 15002 milliseconds` |
+| `mvn -B -ntp -q checkstyle:check` | Agent Pod | 不涉及 | 通过 | 没有违规输出 |
+| `mvn -B -ntp test` | Agent Pod | 不涉及（单元 / 切片测试，Mockito 替身只用于切片测试，不作为 functional 证据） | 通过 | `Tests run: 74, Failures: 0, Errors: 0, Skipped: 0`，`BUILD SUCCESS` |
+| `bash -n .ai-delivery/features/001-v1/runtime/developer-functional-run.sh` | Agent Pod | 不涉及 | 通过 | 语法检查通过 |
+
+本次没有重复运行集成测试和功能测试，因为代码与测试都没有改动。第一个 Session 已用真实 `ticket-db` dev 实例运行并通过，上一 Session 也已用真实 dev 实例完成启动探测。
+
+### Runtime 与下游门禁就绪制品
+
+- `Dockerfile`：未改动（多阶段构建，`USER 10001`，监听 HTTP 8080）。
+- `runtime/deployment.json`：未改动（`containerPort` 8080、`healthPath` `/actuator/health`、`candidateIdentityPath` `/api/candidate-identity`、`requiresPrivateNetwork` false）。
+- Candidate identity endpoint：未改动，只返回平台注入的值，没有回退值。
+- `runtime/developer-functional-run.sh`：未改动，`bash -n` 通过。
+
+### 延后平台证据
+
+- 由更新后的 Runner 重新部署候选，然后在 HTTPS 主机名上请求 `/actuator/health` 与 `/api/candidate-identity` 的结果。
+- 候选验证、镜像构建（ACR Tasks）、Independent QA（IQA-001～IQA-015）、UAT、审批与合并。
+
+### 剩余风险
+
+- 本次在 Agent Pod 中探测时，443 端口仍不可达。按人工说明，这是因为已有入口要等重新部署后才会同步端口；Agent 无法在重新部署前验证修复是否生效。如果重新部署后仍然超时，需要平台提供入口 Service 与 Gateway 的状态。
+- 应用侧的假设风险（内存上限、`/tmp` 可写性、到 Entra 的出站）与上一 Session 相同，目前没有平台证据支持其中任何一项。
+
+### 实施结论
+
+完成：T001～T060 都已完成，本次没有修改代码。静态检查、74 个单元测试和功能脚本语法检查在本次都实际通过。候选健康检查超时经人工确认是平台入口缺陷，Runner 已修复。现提交 `passed`，交给平台按原代码重新部署。本次不声称候选环境已通过，相关证据要等平台重新部署后产生。
