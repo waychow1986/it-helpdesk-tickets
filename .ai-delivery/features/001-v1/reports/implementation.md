@@ -134,3 +134,78 @@
 ### 实施结论
 
 完成。T001～T060 全部实现并勾选，无受阻任务。在 Agent Pod 中按 `deployment.json` 顺序从零执行的结果：静态检查、构建、单元测试 74 个、集成测试 40 个（真实 `ticket-db` dev 实例）、功能测试 IQA-001～IQA-014 共 14 个浏览器流程（localhost + 真实 dev 实例）全部通过；功能测试脚本 `bash -n` 通过；测试数据已按前缀清理。镜像构建、候选部署、Independent QA（含 IQA-015 重新部署验证）等为延后的平台证据，本 Session 未产生也未声称这些结果。
+
+## Coding Session NR-DLV-20261116-72F2B9041E74-0031-b01
+
+### 实施范围
+
+- 模式：`coding-repair`，第 1 批。处理两条机器反馈（非人工决定）：
+  1. 平台执行结果（test-environment，NR-DLV-20261116-72F2B9041E74-0030:0）：候选部署后请求 `https://cand-72f2b9041e74.eastus2.cloudapp.azure.com/actuator/health` 报 `HttpConnectTimeoutException: HTTP connect timed out`。
+  2. upstream-change：自基线 `94b73d20f1e6` 起新增 `reports/convergence.md`。该报告结论为“通过”、阻塞问题“无”、无 findings，没有需要 Coding 修订的条目。
+- 只做根因排查和复现，不改动已批准的产品行为或技术决定，不追加任务。
+
+### 完成与受阻任务
+
+- 本次没有新勾选的任务：T001～T060 在上一 Session 已全部勾选，`progress.completedTaskIds` 为空。
+- 受阻任务：无。
+- 处理反馈的结论：在 Agent Pod 中按候选容器的条件运行，无法复现启动失败或就绪失败。平台报的是到网关公网地址的 TCP 连接超时，请求在到达容器之前就失败了。现有证据都不指向应用代码、`Dockerfile` 或 `deployment.json` 的缺陷，因此本次没有修改代码和运行时契约（理由见“执行命令与结果”和“剩余风险”）。
+
+### 变更文件
+
+| 路径 | 变更 | 来源任务 |
+|---|---|---|
+| `.ai-delivery/features/001-v1/reports/implementation.md` | 追加本 Session 记录（排查过程、复现命令与结论），未改写早先内容 | 修复反馈（候选健康检查连接超时） |
+| `.ai-delivery/features/001-v1/.state/results/NR-DLV-20261116-72F2B9041E74-0031-b01.json` | 新增本次结果文件 | 修复反馈 |
+
+### 需求与场景覆盖
+
+| 来源（FR / AC / IQA） | 实现路径 | 测试路径 | 结果 |
+|---|---|---|---|
+| 部署契约 `healthPath` `/actuator/health`（design“部署契约”） | `src/main/resources/application.yml`（actuator `health` 暴露）、`config/SecurityConfig.java`（`permitAll`） | 本次 localhost 启动探测（见下表） | 通过：可执行 jar 启动约 6 秒后返回 `200 {"status":"UP"}` |
+| 候选身份端点 `/api/candidate-identity` | `src/main/java/com/ithelpdesk/platform/CandidateIdentityController.java` | 本次 localhost 探测 | 通过：返回注入的 `AIDELIVERY_DELIVERY_ID` / `AIDELIVERY_CANDIDATE_SHA` 原值 |
+| FR-029、FR-030、NFR-001（启动迁移与初始管理员引导） | `db/migration/V1__init.sql`、`InitialAdminBootstrap` | 本次 localhost 启动（真实 `ticket-db` dev 实例） | 通过：Flyway 与引导在启动阶段完成，没有 ERROR 日志 |
+| 全部 FR / IQA-001～IQA-014 | 未改动 | `mvn test`（74 个单元/切片测试） | 通过（回归确认，代码未改动） |
+
+### 执行命令与结果
+
+| 命令 | 环境 | 依赖实例（真实 / 替身） | 结果 | 证据 |
+|---|---|---|---|---|
+| `mvn -B -ntp -q -DskipTests package` | Agent Pod | 不涉及 | 通过 | 生成 `target/helpdesk.jar`（53 MB） |
+| 只复制 `pom.xml`、`config`、`src` 到仓库外临时目录后执行 `mvn -B -ntp -q -DskipTests package` | Agent Pod，模拟 `Dockerfile` 构建阶段的构建上下文 | 不涉及 | 通过 | jar 内包含 `application.yml`、`db/migration/V1__init.sql`、`azure-identity-extensions-1.2.10.jar`；说明 Dockerfile 的 COPY 范围够用 |
+| `java -XX:MaxRAMPercentage=75 -jar target/helpdesk.jar`，再轮询 `/actuator/health` 和 `/api/candidate-identity` | Agent Pod localhost:8080 | 真实 `ticket-db` dev 实例（Pod 工作负载身份，Entra 令牌） | 通过 | `Started HelpdeskApplication in 5.464 seconds`；health 返回 200 `{"status":"UP",...}` |
+| 同上，另加 `env -u HOME`、`-Duser.home=?`、`-XX:ActiveProcessorCount=1`（模拟 UID 10001 在镜像中没有 passwd 条目、单核） | Agent Pod localhost:8080 | 真实 `ticket-db` dev 实例 | 通过 | 约 6 秒后 UP；身份端点返回注入值 `{"deliveryId":"x","candidateSha":"y"}`（测试值） |
+| `-Xmx192m -XX:ActiveProcessorCount=1` 启动后连续请求 `/login`、`/actuator/health`，读取 `/proc/<pid>/status` | Agent Pod localhost:8080 | 真实 `ticket-db` dev 实例 | 通过 | 约 8 秒后 UP；`VmRSS` 约 297 MB |
+| `-Djava.io.tmpdir=<只读目录>` 启动 | Agent Pod localhost | 真实 `ticket-db` dev 实例 | 失败（预期内的诊断） | Tomcat 报 `Unable to create tempDir`。说明只有临时目录不可写才会导致启动失败；`eclipse-temurin:21-jre` 的 `/tmp` 是 1777 权限，平台运行环境画像也没有说明会使用只读根文件系统 |
+| `getent hosts cand-72f2b9041e74.eastus2.cloudapp.azure.com`；`curl -m 15 https://cand-72f2b9041e74.eastus2.cloudapp.azure.com/actuator/health` | Agent Pod | 不涉及 | DNS 正常；TCP 连接超时 | DNS 解析到 `57.165.12.113`；`curl: (28) Connection timed out after 15002 milliseconds`，与平台观察一致。Pod 出站策略也可能限制这条访问，所以这只是辅助证据 |
+| `mvn -B -ntp checkstyle:check` | Agent Pod | 不涉及 | 通过 | `You have 0 Checkstyle violations.` |
+| `mvn -B -ntp test` | Agent Pod | 不涉及（单元/切片） | 通过 | `Tests run: 74, Failures: 0, Errors: 0, Skipped: 0` |
+| `bash -n .ai-delivery/features/001-v1/runtime/developer-functional-run.sh` | Agent Pod | 不涉及 | 通过 | 语法检查通过 |
+
+本次没有重复运行集成测试和功能测试：代码与测试都没有改动，上一 Session 已用真实 dev 实例运行并通过。启动探测用的是真实 `ticket-db` dev 实例，没有使用替身。
+
+### Runtime 与下游门禁就绪制品
+
+- `Dockerfile`：未改动。多阶段构建，运行阶段 `eclipse-temurin:21-jre`，`USER 10001`，监听 HTTP 8080。本次验证了构建上下文可以打出完整 jar。
+- `runtime/deployment.json`：未改动。`containerPort` 8080、`healthPath` `/actuator/health`、`candidateIdentityPath` `/api/candidate-identity`、`requiresPrivateNetwork` false，验证命令按类别组织。
+- Candidate identity endpoint：未改动。本次 localhost 验证它原样返回平台注入的两个变量，没有虚构的回退值。
+- `runtime/developer-functional-run.sh`：未改动，`bash -n` 通过。
+
+### 延后平台证据
+
+- 候选重新部署后，`/actuator/health` 与 `/api/candidate-identity` 在 HTTPS 主机名上的可达性和返回值，由平台候选部署产生。本 Session 无法在 Agent Pod 中获得，不声称候选环境已通过。
+- 候选容器日志（Flyway 迁移、`ticket-db` test 实例连接、Entra 令牌获取）和 Pod 就绪状态只有平台可以查看。
+- 镜像构建（ACR Tasks）、Independent QA（IQA-001～IQA-015）。
+
+### 剩余风险
+
+- 根因判断：平台错误是 `HTTP connect timed out`，也就是到网关公网地址 `57.165.12.113` 的 TCP 连接没有建立，失败发生在 TLS 和 HTTP 之前。网关本身可达时，即使后端容器没有就绪，通常也会接受连接并返回 5xx，而不是连接超时。因此现有证据更指向网关、负载均衡、公网 IP 或网络策略这一层，或者探测时这些尚未就绪。这个判断无法在 Agent Pod 中证实。
+- 如果平台日志显示容器本身没有就绪，可能的原因及其在 Pod 中的验证情况：
+  1. 候选出站策略没有放行 Entra 令牌终结点，导致无法连接 `ticket-db` test 实例，启动失败。这属于平台和依赖绑定层面的问题。
+  2. 根文件系统只读，`java.io.tmpdir` 不可写，Tomcat 无法启动。画像未说明会这样运行；如果确实如此，需要平台提供可写的 `/tmp`。
+  3. 容器内存上限过低。启动后 RSS 约 297 MB，内存上限低于约 384 MiB 时有被 OOMKill 的风险。画像没有给出资源上限。
+  这几项都没有平台证据支持，所以本次没有为假设的原因改动已批准的 JVM 参数（`-XX:MaxRAMPercentage=75`）或运行时契约。
+- 如果重新部署仍然失败，需要平台提供候选 Pod 事件与容器日志，下一次修复 Session 再按日志定位。
+
+### 实施结论
+
+部分完成：本次只完成了排查和记录，没有修复任何问题。在 Agent Pod 中，构建、静态检查、74 个单元测试和功能脚本语法检查都通过；可执行 jar 连接真实 `ticket-db` dev 实例，并在模拟容器条件（无 HOME、未解析的 `user.home`、单核、受限堆）下约 6～8 秒就绪；健康端点和候选身份端点的行为符合部署契约。候选健康检查的连接超时无法在 Pod 中复现，现有证据指向网关、网络层，而不是应用代码。因此本次没有修改代码、`Dockerfile` 或 `deployment.json`。候选环境是否可达要等平台重新部署后确认，本次不声称候选环境已通过。
