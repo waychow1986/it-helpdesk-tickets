@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0015",
+  "stage": "technical-solution",
+  "outcome": "passed",
+  "summary": "已完成技术方案：Java 21 + Spring Boot 3.5 服务端渲染单体，单一 postgres 依赖 ticket-db（Entra 无密码、sslmode=require、Flyway 只增不删启动迁移），给出数据模型、路由契约、授权与报表口径实现、测试与验证责任矩阵，并声明 docs/dependencies.json。",
+  "artifacts": [
+    {"path": ".ai-delivery/features/001-v1/design.md"},
+    {"path": "docs/dependencies.json"}
+  ]
+}
