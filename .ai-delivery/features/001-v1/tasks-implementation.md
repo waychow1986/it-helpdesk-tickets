@@ -20,7 +20,13 @@
 
 - Phase 1（Setup）→ Phase 2（Foundational）→ 用户故事阶段。Phase 2 完成后各用户故事的测试任务可并行编写。
 - 用户故事实现链：US-001（T026）→ US-002（T029）；US-003（T033）→ US-004（T037）→ US-005（T041）→ US-006（T044）→ US-007（T048）→ US-008（T052）→ US-009（T056）；US-010（T057～T058）依赖 Foundational 迁移与 US-007 的写操作。
-- 跨故事功能测试：IQA-009 的 e2e（T028）需要 US-006 的认领 / 分派能力才能全部通过；IQA-003 的搜索 / 筛选步骤（T040）需要 US-008 实现后才能全部通过。这两项在对应实现任务完成后作为该故事的完成证据重新执行。
+- 跨故事功能测试：以下 e2e 在测试先行阶段编写，但其部分步骤依赖后续故事的实现，只能在所列前置实现任务全部完成后才能整体通过；它们在前置实现任务完成后重新执行，作为所属故事的完成证据：
+  - IQA-009（T028，US-002）→ 需要 T044（US-006 认领 / 分派）。
+  - IQA-008（T032，US-003）→ 需要 T037（员工用该类别提交工单、详情基本信息）、T041（工单详情页路由与"改名后详情显示新名"）、T052（IT 同事按该类别筛选找到历史工单）。
+  - IQA-002（T036，US-004）的详情与列表步骤 → 需要 T041（`GET /tickets/{id}`、员工"我的工单"与 IT 同事全部列表）。
+  - IQA-003（T040，US-005）的搜索 / 筛选步骤 → 需要 T052（US-008）。
+  - IQA-004（T040，US-005）的 IT 同事回复与空回复步骤 → 需要 T048（US-007 IT 同事回复路径）。
+- 在前置实现任务完成之前，上述故事以其单元 / 切片测试与 `*IT` 集成测试作为阶段内完成证据；对应 e2e 的整体通过记录在前置实现任务完成后补齐，不得以跳过或删除步骤代替。
 - Phase 13（Polish）依赖全部用户故事阶段。
 
 ## Phase 1：Setup
@@ -73,7 +79,7 @@
 ### 测试
 
 - [ ] T027 [P] [US2] 编写 `UserRoleChangeIT`：管理员可在 `EMPLOYEE ↔ IT_STAFF` 间切换、管理员账号与 `ADMIN` 目标值被拒；身份变更后目标会话下一次请求即按新身份授权（结合 `RoleRefreshFilter`）；取消 IT 同事身份后不再出现在当前 IT 同事列表，其已作为处理人的工单 `assignee_id` 不被清空（`src/test/java/com/ithelpdesk/user/UserRoleChangeIT.java`；来源：FR-004、TD-006、INV-002、IQA-009；依赖：T007、T016）
-- [ ] T028 [P] [US2] 编写功能测试：管理员把员工 U1 设为 IT 同事 → U1 看到全部工单并认领一张；取消身份 → U1 只具备员工能力（导航与直接访问 IT 操作被拒）、T1 的分派对象列表中不含 U1、U1 认领过的工单仍显示 U1 为处理人（`e2e/tests/iqa-009-it-staff-role.spec.ts`；来源：IQA-009、AC-004、FR-004；依赖：T020）
+- [ ] T028 [P] [US2] 编写功能测试：管理员把员工 U1 设为 IT 同事 → U1 看到全部工单并认领一张；取消身份 → U1 只具备员工能力（导航与直接访问 IT 操作被拒）、T1 的分派对象列表中不含 U1、U1 认领过的工单仍显示 U1 为处理人（认领 / 分派步骤在 T044 完成后通过）（`e2e/tests/iqa-009-it-staff-role.spec.ts`；来源：IQA-009、AC-004、FR-004；依赖：T020）
 
 ### 实现
 
@@ -85,7 +91,7 @@
 
 - [ ] T030 [P] [US3] 编写 `CategoryServiceTest`：名称去首尾空白后为空被拒（"类别名称不能为空"类提示）、超过 50 字符被拒、非管理员调用被拒（`src/test/java/com/ithelpdesk/category/CategoryServiceTest.java`；来源：FR-005、TD-013；依赖：T016）
 - [ ] T031 [P] [US3] 编写 `CategoryIT`：新增、改名、移除（`active=false`、`removed_at` 写入）；与有效类别同名（新增或改名）被拒并提示"类别名称已存在"，与已移除类别同名允许；移除后不在有效类别查询中、历史工单外键保留且显示新名称（`src/test/java/com/ithelpdesk/category/CategoryIT.java`；来源：FR-005、FR-006、INV-007、IQA-008；依赖：T007、T013）
-- [ ] T032 [P] [US3] 编写功能测试：管理员新增前缀类别"测试类别甲"→ 员工用其提交工单；新增空名与重名被拒；改名为"测试类别乙"后工单详情显示新名；移除后员工提交页无该选项、IT 同事按该类别筛选仍能找到历史工单（`e2e/tests/iqa-008-categories.spec.ts`；来源：IQA-008、AC-005、FR-005、FR-006；依赖：T020）
+- [ ] T032 [P] [US3] 编写功能测试：管理员新增前缀类别"测试类别甲"→ 员工用其提交工单；新增空名与重名被拒；改名为"测试类别乙"后工单详情显示新名；移除后员工提交页无该选项、IT 同事按该类别筛选仍能找到历史工单（提交、详情与筛选步骤分别在 T037、T041、T052 完成后通过）（`e2e/tests/iqa-008-categories.spec.ts`；来源：IQA-008、AC-005、FR-005、FR-006；依赖：T020）
 
 ### 实现
 
@@ -97,11 +103,12 @@
 
 - [ ] T034 [P] [US4] 编写 `TicketFormValidationTest`：标题、描述、类别、紧急程度任一为空或仅含空白时逐项给出"请填写标题""请填写问题描述""请选择类别""请选择紧急程度"类提示、超长被拒、紧急程度只接受 `LOW`/`MEDIUM`/`HIGH`、失败时保留已填内容（`src/test/java/com/ithelpdesk/ticket/TicketFormValidationTest.java`；来源：FR-007、TD-013、PQ-001；依赖：T016）
 - [ ] T035 [P] [US4] 编写 `TicketSubmitIT`：员工提交后生成唯一 `id`、`status=OPEN`、`assignee_id` 为空、`submitted_at` 等于测试时钟、提交人正确；已移除类别被拒"所选类别已不可用"；非员工提交被拒；仓库层不存在修改标题 / 描述 / 类别 / 紧急程度 / 提交人的语句路径（`src/test/java/com/ithelpdesk/ticket/TicketSubmitIT.java`；来源：FR-007、FR-008、FR-009、INV-004、IQA-002；依赖：T007、T013）
-- [ ] T036 [P] [US4] 编写功能测试：提交页紧急程度选项恰为"低、中、高"；分别留空四项各提交一次，`field-error-<字段名>` 指出缺失项且已填内容保留；以三种紧急程度各提交一张，详情显示编号、紧急程度、待处理、未分配、提交人与提交时间；详情无修改基本信息入口；工单出现在员工"我的工单"与 IT 同事全部列表；无有效类别时显示"暂无可选类别，请联系管理员"且无提交按钮（该情形在测试内以前缀员工视角校验页面条件渲染，不移除共享库中他人类别）（`e2e/tests/iqa-002-submit-ticket.spec.ts`；来源：IQA-002、AC-006、FR-007、FR-008、FR-009、spec「前置条件」；依赖：T020）
+- [ ] T036 [P] [US4] 编写功能测试：提交页紧急程度选项恰为"低、中、高"；分别留空四项各提交一次，`field-error-<字段名>` 指出缺失项且已填内容保留；以三种紧急程度各提交一张，详情显示编号、紧急程度、待处理、未分配、提交人与提交时间；详情无修改基本信息入口；工单出现在员工"我的工单"与 IT 同事全部列表（详情与列表步骤在 T041 完成后通过）；"无有效类别"分支不属于本 e2e（共享 `dev` 库中类别为全局数据，无法在不改动他人数据的前提下进入该状态），由 T060 验证（`e2e/tests/iqa-002-submit-ticket.spec.ts`；来源：IQA-002、AC-006、FR-007、FR-008、FR-009；依赖：T020）
+- [ ] T060 [P] [US4] 编写 `TicketNewPageTest`（`@WebMvcTest(TicketController.class)`，对类别服务与工单命令服务使用替身，只验证视图条件渲染与请求处理）：以员工身份 `GET /tickets/new`，有效类别为空时页面显示"暂无可选类别，请联系管理员"且不渲染 `ticket-submit` 与 `ticket-category` 选项；有效类别非空时渲染 `ticket-category` 选项与 `ticket-submit`、`ticket-urgency` 选项恰为"低、中、高"；`POST /tickets` 在命令服务以"所选类别已不可用"拒绝时重新渲染表单并显示该提示、保留已填内容（`src/test/java/com/ithelpdesk/ticket/TicketNewPageTest.java`；来源：spec「前置条件」提交工单前置、FR-007、design「HTTP 路由」`GET /tickets/new`；依赖：T011）
 
 ### 实现
 
-- [ ] T037 [US4] 实现工单提交：`TicketStatus`、`Urgency`、`EventType` 枚举（码值与中文显示）、`Ticket`、`TicketRepository`（插入、按 id 查询，无更新基本信息语句）、`TicketForm`、`TicketCommandService.submit`（事务内确认类别有效、`clock.instant()`）、`TicketController`（`GET /tickets/new`、`POST /tickets`，PRG + "工单已提交"）、`tickets/new.html`（`ticket-title`/`ticket-description`/`ticket-category`/`ticket-urgency`/`ticket-submit`、`novalidate`、无有效类别提示）、`tickets/detail.html` 基本信息区（`ticket-id`、`ticket-status`、`ticket-assignee`）（`src/main/java/com/ithelpdesk/ticket/`、`src/main/resources/templates/tickets/new.html`、`src/main/resources/templates/tickets/detail.html`；来源：FR-007、FR-008、FR-009、TD-013、design「关键流程」3；依赖：T033、T034、T035、T036）
+- [ ] T037 [US4] 实现工单提交：`TicketStatus`、`Urgency`、`EventType` 枚举（码值与中文显示）、`Ticket`、`TicketRepository`（插入、按 id 查询，无更新基本信息语句）、`TicketForm`、`TicketCommandService.submit`（事务内确认类别有效、`clock.instant()`）、`TicketController`（`GET /tickets/new`、`POST /tickets`，PRG + "工单已提交"）、`tickets/new.html`（`ticket-title`/`ticket-description`/`ticket-category`/`ticket-urgency`/`ticket-submit`、`novalidate`、无有效类别提示）、`tickets/detail.html` 基本信息区（`ticket-id`、`ticket-status`、`ticket-assignee`）（`src/main/java/com/ithelpdesk/ticket/`、`src/main/resources/templates/tickets/new.html`、`src/main/resources/templates/tickets/detail.html`；来源：FR-007、FR-008、FR-009、TD-013、design「关键流程」3；依赖：T033、T034、T035、T036、T060）
 
 ## Phase 7：US-005 - 员工跟踪自己的工单并补充说明
 
@@ -109,11 +116,11 @@
 
 - [ ] T038 [P] [US5] 编写 `TicketAccessIT`：员工列表只含本人工单（不限状态）；员工读取他人或不存在的工单均抛出同一拒绝；员工可在本人任意状态（含已关闭）工单下添加补充说明，空 / 仅空白被拒；补充说明不改变 `status`、`assignee_id`；沟通记录按 `created_at, id` 排序并记录 `author_role`；员工对他人工单添加补充说明被拒（`src/test/java/com/ithelpdesk/ticket/TicketAccessIT.java`；来源：FR-010、FR-011、FR-012、FR-013、FR-019、INV-003、INV-005、TD-014、IQA-003、IQA-004；依赖：T007、T013）
 - [ ] T039 [P] [US5] 编写 `TicketControllerTest`（`@WebMvcTest`）：员工访问他人 / 不存在工单返回 403 且响应不含标题、描述或任何工单字段；员工详情页不含 `claim-button`、`assign-select`、`status-select`；管理员访问 `/tickets` 与详情被拒（`src/test/java/com/ithelpdesk/ticket/TicketControllerTest.java`；来源：FR-013、FR-021、TD-014、A-004；依赖：T011）
-- [ ] T040 [P] [US5] 编写功能测试：E1、E2 各提交 2 张含相同关键词、状态不同的合成工单；E1"我的工单"恰含其全部工单并显示正确状态与处理人；E1 直接访问 E2 工单显示 `forbidden` 且无内容泄露；E1 关键词搜索与各条件筛选不出现 E2 工单（`e2e/tests/iqa-003-employee-isolation.spec.ts`）；E1 添加补充说明与空补充说明、T1 回复与空回复、双方看到一致的沟通记录（作者、身份、时间、内容）、状态与处理人不变、已关闭工单仍可补充说明（`e2e/tests/iqa-004-comments.spec.ts`）（`e2e/tests/`；来源：IQA-003、IQA-004、AC-007、AC-008、AC-009、AC-013、FR-010～FR-013、FR-018、FR-019、FR-024；依赖：T020）
+- [ ] T040 [P] [US5] 编写功能测试：E1、E2 各提交 2 张含相同关键词、状态不同的合成工单；E1"我的工单"恰含其全部工单并显示正确状态与处理人；E1 直接访问 E2 工单显示 `forbidden` 且无内容泄露；E1 关键词搜索与各条件筛选不出现 E2 工单（`e2e/tests/iqa-003-employee-isolation.spec.ts`，搜索 / 筛选步骤在 T052 完成后通过）；E1 添加补充说明与空补充说明、T1 回复与空回复（回复步骤在 T048 完成后通过）、双方看到一致的沟通记录（作者、身份、时间、内容）、状态与处理人不变、已关闭工单仍可补充说明（`e2e/tests/iqa-004-comments.spec.ts`）（`e2e/tests/`；来源：IQA-003、IQA-004、AC-007、AC-008、AC-009、AC-013、FR-010～FR-013、FR-018、FR-019、FR-024；依赖：T020）
 
 ### 实现
 
-- [ ] T041 [US5] 实现员工查看与补充说明：`TicketComment`、`TicketEvent`、`TicketCommentRepository`（插入、按工单查询）、`TicketEventRepository`（按工单查询）、`CommentForm`、`TicketQueryService`（员工可见范围 `submitter_id = 本人`、详情授权与 TD-014 统一 403）、`TicketCommandService.addComment`（员工须为提交人，记录 `author_role`）、`TicketController`（`GET /tickets` 基础列表与分页、`GET /tickets/{id}`、`POST /tickets/{id}/comments`）、`tickets/list.html`（"我的工单"/"全部工单"标题、`ticket-row` 含 `data-ticket-id`、编号 / 标题 / 类别 / 紧急程度 / 状态 / 处理人或"未分配" / 提交时间）、`tickets/detail.html` 沟通记录（`comment-item`、`comment-body`、`comment-submit`）与处理记录（`event-item`）区（`src/main/java/com/ithelpdesk/ticket/`、`src/main/resources/templates/tickets/list.html`、`src/main/resources/templates/tickets/detail.html`；来源：FR-010、FR-011、FR-012、FR-013、FR-019、FR-020、TD-012、TD-014、design「关键流程」4；依赖：T037、T038、T039、T040）
+- [ ] T041 [US5] 实现员工查看与补充说明：`TicketComment`、`TicketEvent`、`TicketCommentRepository`（插入、按工单查询）、`TicketEventRepository`（按工单查询）、`CommentForm`、`TicketQueryService`（员工可见范围 `submitter_id = 本人`、IT 同事可见全部工单、详情授权与 TD-014 统一 403）、`TicketCommandService.addComment`（员工须为提交人，记录 `author_role`）、`TicketController`（`GET /tickets` 基础列表与分页、`GET /tickets/{id}`、`POST /tickets/{id}/comments`）、`tickets/list.html`（"我的工单"/"全部工单"标题、`ticket-row` 含 `data-ticket-id`、编号 / 标题 / 类别 / 紧急程度 / 状态 / 处理人或"未分配" / 提交时间）、`tickets/detail.html` 沟通记录（`comment-item`、`comment-body`、`comment-submit`）与处理记录（`event-item`）区（`src/main/java/com/ithelpdesk/ticket/`、`src/main/resources/templates/tickets/list.html`、`src/main/resources/templates/tickets/detail.html`；来源：FR-010、FR-011、FR-012、FR-013、FR-019、FR-020、TD-012、TD-014、design「关键流程」4；依赖：T037、T038、T039、T040）
 
 ## Phase 8：US-006 - IT 同事查看、认领与分派工单
 
@@ -171,7 +178,7 @@
 
 ## Phase 13：Polish
 
-- [ ] T059 在 Agent Pod 中按 `deployment.json` 顺序完整执行 `developerSetupCommands` 与 `staticAnalysis` → `build` → `developerTests` → `integrationTests` → `functionalTests`，并对 `developer-functional-run.sh` 执行 `bash -n`；修复失败项后，把各命令结果、使用真实 `ticket-db` `dev` 实例的验证清单（运行前缀与清理记录）、单元测试中替身的范围与原因、以及延后的平台证据追加到实施证据账本，不写入任何密码、令牌或客户内容（`.ai-delivery/features/001-v1/reports/implementation.md`；来源：宪章「测试与质量」「交付治理」、design「验证环境责任矩阵」；依赖：T022、T029、T052、T056、T057、T058）
+- [ ] T059 在 Agent Pod 中按 `deployment.json` 顺序完整执行 `developerSetupCommands` 与 `staticAnalysis` → `build` → `developerTests` → `integrationTests` → `functionalTests`，并对 `developer-functional-run.sh` 执行 `bash -n`；修复失败项后，把各命令结果、使用真实 `ticket-db` `dev` 实例的验证清单（运行前缀与清理记录）、单元测试中替身的范围与原因、以及延后的平台证据追加到实施证据账本，不写入任何密码、令牌或客户内容（`.ai-delivery/features/001-v1/reports/implementation.md`；来源：宪章「测试与质量」「交付治理」、design「验证环境责任矩阵」；依赖：T002、T003、T005、T018、T019、T021、T022、T026、T029、T033、T037、T041、T044、T048、T052、T056、T057、T058）
 
 ## 完成证据
 
@@ -181,7 +188,7 @@
 |---|---|
 | Phase 1 Setup | `mvn -B -ntp checkstyle:check`、`mvn -B -ntp -DskipTests package` 成功；`target/helpdesk.jar` 生成；`cd e2e && npm ci` 成功（仅为辅助证据） |
 | Phase 2 Foundational | `mvn test` 中安全 / 端点 / 日志 / 引导单元与切片测试通过；`mvn verify -Pintegration` 中 `MigrationIT`、`InitialAdminBootstrapIT` 对 `dev` 实例通过；localhost 启动后 `/actuator/health` 为 UP、`/api/candidate-identity` 返回 JSON（辅助证据）；`bash -n` 检查 `developer-functional-run.sh` |
-| US-001～US-009 | 对应 `*Test`（单元 / 切片）、`*IT`（真实 `dev` 实例）与 `e2e/tests/iqa-001`～`iqa-014` 的 Playwright 功能测试在 localhost:8080 + `dev` 实例上通过；IQA-009 与 IQA-003 的跨故事步骤在 T044、T052 完成后重新执行并通过 |
+| US-001～US-009 | 对应 `*Test`（单元 / 切片）、`*IT`（真实 `dev` 实例）与 `e2e/tests/iqa-001`～`iqa-014` 的 Playwright 功能测试在 localhost:8080 + `dev` 实例上通过。"无有效类别"提示与不可提交行为由 `TicketNewPageTest`（T060，切片测试）验证。含跨故事步骤的 e2e 在前置实现任务完成后重新执行，作为所属故事的完成证据：IQA-009（US-002）在 T044 后；IQA-008（US-003）在 T037、T041、T052 后；IQA-002（US-004）在 T041 后；IQA-003（US-005）在 T052 后；IQA-004（US-005）在 T048 后。在此之前，这些故事的阶段内证据为其 `*Test` 与 `*IT` 通过 |
 | US-010 | `MigrationPolicyTest` 与 `DataRetentionIT`（真实 `dev` 实例、重新启动应用上下文前后快照一致）通过，作为 IQA-015 的开发者侧对应证据 |
 | Polish | `reports/implementation.md` 中记录完整验证序列输出摘要、真实依赖使用清单与替身说明 |
 
