@@ -2,14 +2,14 @@
 
 ## 评审范围
 
-- 模式：recheck（上一轮门禁记录 `GR-DLV-20261116-72F2B9041E74-0007`）；nodeRunId `NR-DLV-20261116-72F2B9041E74-0032`。上一轮 findings 为空。
-- 本轮基线：`e688e33`（上一轮 Convergence `NR-DLV-20261116-72F2B9041E74-0027`）→ 被评审提交 `5b07ffd`（aidh: coding NR-DLV-20261116-72F2B9041E74-0031-b01，`coding-repair` 第 1 批）。
-- 本轮改动只有两个文件：`reports/implementation.md` 追加了「Coding Session NR-DLV-20261116-72F2B9041E74-0031-b01」一节；新增结果文件 `.state/results/NR-DLV-20261116-72F2B9041E74-0031-b01.json`。代码、测试、`Dockerfile`、`runtime/deployment.json`、`runtime/developer-functional-run.sh`、任务和上游制品都没有改动（`git diff e688e33..5b07ffd --stat` 确认）。
-- 复核重点：新增 Session 记录的排查命令与结论是否与仓库中的 `Dockerfile`、`application.yml`、`deployment.json` 一致；是否有无证据的成功声明；改动对未改内容的一致性影响。未改动、上一轮也没有提出问题的内容沿用上一轮（initial，`NR-DLV-20261116-72F2B9041E74-0027`）的结论，下文保留其记录。
+- 模式：recheck（上一轮门禁记录 `GR-DLV-20261116-72F2B9041E74-0008`）；nodeRunId `NR-DLV-20261116-72F2B9041E74-0037`。上一轮 findings 为空。
+- 本轮基线：`6dadea1`（上一轮 Convergence `NR-DLV-20261116-72F2B9041E74-0032`）→ 被评审提交 `5a1df2f`。期间有两个 `coding-repair` Session：`NR-DLV-20261116-72F2B9041E74-0035-b01`（提交 `208736a`）和 `NR-DLV-20261116-72F2B9041E74-0036-b01`（提交 `5a1df2f`）。
+- 本轮改动只有三个文件：`reports/implementation.md` 追加了上述两个 Session 的记录；新增结果文件 `.state/results/NR-DLV-20261116-72F2B9041E74-0035-b01.json`（`needs_input`，IN-OPS-001）和 `.state/results/NR-DLV-20261116-72F2B9041E74-0036-b01.json`（`passed`）。代码、测试、`pom.xml`、`Dockerfile`、`runtime/` 下的制品、任务和上游制品都没有改动（`git diff 6dadea116453..HEAD --stat` 确认）。
+- 复核重点：新增 Session 记录的命令与结论是否与仓库中的 `deployment.json`、`Dockerfile` 一致；是否有无证据的成功声明；改动对未改内容的一致性影响。未改动、上一轮也没有提出问题的内容沿用此前各轮（initial `NR-DLV-20261116-72F2B9041E74-0027`、recheck `NR-DLV-20261116-72F2B9041E74-0032`）的结论，下文保留其记录。
 
 ## 结论
 
-`通过`。上一轮没有 findings；本轮改动只是追加实施报告记录，没有引入新的 critical / high 阻塞问题。结果文件 `findings` 为空，`outcome` 为 `passed`。
+`通过`。上一轮没有 findings；本轮改动只是追加两个 Coding Session 的实施报告记录和结果文件，没有改动代码或就绪制品，也没有引入新的 critical / high 阻塞问题。结果文件 `findings` 为空，`outcome` 为 `passed`。
 
 ## 阻塞问题
 
@@ -45,13 +45,21 @@
 - 真实依赖与替身边界：集成测试和功能测试都通过 `AIDH_DEP_TICKET_DB_*` 加 Entra 令牌连接真实 `ticket-db` dev 实例，没有使用 H2、Testcontainers 或其他数据库替身。Mockito 替身只出现在单元 / Web 切片测试中，实施报告已注明这些测试不作为 functional 证据。
 - 报告如实记录了两次完整序列，以及第一次运行后修正的问题（`skipTests` 绑定、切片测试打印 Boot 生成的密码）。镜像构建和候选部署被如实标为未执行。
 
-### 本轮新增 Session（NR-DLV-20261116-72F2B9041E74-0031-b01）复核
+### 上一轮复核的 Session（NR-DLV-20261116-72F2B9041E74-0031-b01）
 
 - 处理对象：平台候选部署后探测 `https://cand-72f2b9041e74.eastus2.cloudapp.azure.com/actuator/health` 报 `HttpConnectTimeoutException`（机器反馈）。Coding 没有修改代码或运行时契约，只追加了排查记录。
 - 记录与仓库一致：报告所述 `Dockerfile` 构建上下文（`pom.xml`、`config`、`src`）、运行阶段 `eclipse-temurin:21-jre`、`USER 10001`、`EXPOSE 8080`、`-XX:MaxRAMPercentage=75`，与仓库中 `Dockerfile` 逐项相符；`application.yml` 的 `server.port: 8080` 未绑定回环地址，与 `deployment.json` 的 `containerPort` 8080、`healthPath`、`candidateIdentityPath` 一致。
 - 回归命令（`checkstyle:check`、`mvn -B -ntp test` 74 个、`bash -n`）与 `deployment.json` 中的命令一致；因代码与测试未改动，未重跑集成和功能测试的说明成立，上一轮复核的集成 / 功能证据仍然有效。
 - 没有无证据的成功声明：报告明确写明连接超时无法在 Agent Pod 中复现、根因判断（网关 / 网络层）未经证实、候选环境可达性属于延后平台证据，没有声称候选环境已通过。localhost 启动探测使用真实 `ticket-db` dev 实例，没有用 health check 代替 functional 证据。
 - 结果文件 `outcome` 为 `passed` 而报告「实施结论」写“部分完成：只完成了排查和记录”，两者措辞不同，但任务 T001～T060 均已完成、无受阻任务，排查结论也如实记录，不构成阻塞（见非阻塞观察）。
+
+### 本轮新增 Session（NR-DLV-20261116-72F2B9041E74-0035-b01、NR-DLV-20261116-72F2B9041E74-0036-b01）复核
+
+- 处理对象：候选重新部署后（`NR-DLV-20261116-72F2B9041E74-0034`）HTTPS 主机名的 `/actuator/health` 仍报 `HttpConnectTimeoutException`（机器反馈）。两个 Session 都没有修改代码、测试或运行时契约。
+- `0035-b01`：记录了端口级定位证据（80 端口返回 301 跳转到 HTTPS，443 端口 TCP 超时，Pod 访问其他公网 443 正常），据此判断失败点在平台网关入口，并以 `needs_input`（IN-OPS-001，`suggestedProvider`=operator）请求运维处理。结论与证据相符，没有把未经证实的推测（ACME HTTP-01 跳转）写成事实。localhost 启动探测连接真实 `ticket-db` dev 实例，health 与身份端点的返回值与 `deployment.json` 的 `healthPath`、`candidateIdentityPath` 一致。上一轮非阻塞观察提出的措辞问题已处理：该 Session「实施结论」写“需要运维输入”，与结果文件 `outcome: needs_input` 一致。
+- `0036-b01`：依据人工审批意见 HT-DLV-20261116-72F2B9041E74-0009（平台入口 Service 未同步 443 端口，Runner 已修复，要求按原代码重新部署）提交 `passed`。这与 `0035-b01` 的定位一致，也没有超出人工意见改动产品行为。报告如实记录 Pod 中 443 仍不可达（要等重新部署才会生效），没有声称候选环境已通过；「实施结论」“完成”与 `outcome: passed` 一致。
+- 回归命令与 `deployment.json` 一致：`mvn -B -ntp checkstyle:check`（`0036-b01` 加了 `-q`，只减少输出，不影响检查）、`mvn -B -ntp test`（74 个，与仓库中的 `*Test` 数量和此前各轮记录一致）、`bash -n developer-functional-run.sh`。代码与测试未改动，所以未重跑集成和功能测试的说明成立，此前复核过的真实 dev 实例集成 / 功能证据仍然有效。
+- 没有用 health check 代替 functional 证据：两个 Session 的 health / 身份端点探测只用于定位部署问题，没有作为 functional 验收依据。
 
 ## 用户可见行为比较
 
@@ -78,7 +86,7 @@
 
 - 候选验证：Runner 在不可变候选提交上执行 `deployment.json` 中的命令，并对 `developer-functional-run.sh` 做语法检查。
 - 镜像构建：ACR Tasks 以根目录 `Dockerfile` 构建，镜像用户解析为 UID 10001（Agent Pod 无 Docker 守护进程，未在本地构建）。
-- 候选部署：`cand-{deliveryShortId}` 命名空间部署，以及基于 `ticket-db` `test` 实例的 `healthPath` / `candidateIdentityPath` 校验。上一次候选部署（`NR-DLV-20261116-72F2B9041E74-0030`）的 HTTPS 主机名连接超时尚待平台重新部署确认；候选 Pod 事件与容器日志只有平台可以查看。
+- 候选部署：`cand-{deliveryShortId}` 命名空间部署，以及基于 `ticket-db` `test` 实例的 `healthPath` / `candidateIdentityPath` 校验。此前两次候选部署（`NR-DLV-20261116-72F2B9041E74-0030`、`NR-DLV-20261116-72F2B9041E74-0034`）的 HTTPS 主机名连接超时，经人工意见确认是平台入口缺陷，Runner 已修复；修复后按原代码重新部署的 health / 身份端点结果尚待平台产生，候选 Pod 事件与容器日志只有平台可以查看。
 - Independent QA：IQA-001～IQA-015 在已部署候选上的验收，其中 IQA-015 需要平台实际执行一次重新部署或升级。
 - 生产首次投入使用时，运维按 design「支持 Runbook」设置初始管理员的首个凭据；以及 UAT、人工审批、发布与合并。
 
@@ -89,5 +97,6 @@
 - 筛选下拉中的处理人选项（当前 IT 同事以及曾作为处理人的账号）对员工也可见，只暴露 IT 同事姓名，不暴露他人工单内容，与 design「搜索与筛选」一致。
 - HttpSession 存在内存中，单副本运行；重新部署后用户需要重新登录，design 已说明，数据不受影响。
 - 初始管理员在首次启动时创建且没有凭据，投入使用前需运维执行 Runbook，这是已批准的 TD-011 设计。
-- 候选健康检查连接超时（本轮新增）：失败发生在到网关公网地址的 TCP 连接阶段，Coding 在 Pod 中按容器条件（无 HOME、单核、受限堆）启动均在约 6～8 秒就绪，现有证据未指向应用、`Dockerfile` 或 `deployment.json` 的缺陷，Convergence 也未在这些文件中发现与部署契约不符之处。若平台重新部署后容器日志显示应用未就绪（如出站到 Entra 受限、`/tmp` 不可写或内存上限低于约 384 MiB），应作为新的修复反馈处理。
-- 实施报告第二段「实施结论」写“部分完成”，与该 Session 结果文件 `outcome: passed` 措辞不一致；含义是“未修复任何代码问题、仅完成排查”，不影响任务完成状态，建议后续 Session 统一措辞。
+- 候选健康检查连接超时（上一轮记录）：失败发生在到网关公网地址的 TCP 连接阶段，Coding 在 Pod 中按容器条件（无 HOME、单核、受限堆）启动均在约 6～8 秒就绪，现有证据未指向应用、`Dockerfile` 或 `deployment.json` 的缺陷，Convergence 也未在这些文件中发现与部署契约不符之处。若平台重新部署后容器日志显示应用未就绪（如出站到 Entra 受限、`/tmp` 不可写或内存上限低于约 384 MiB），应作为新的修复反馈处理。
+- 实施报告中 `NR-DLV-20261116-72F2B9041E74-0031-b01` 段的「实施结论」写“部分完成”，与该 Session 结果文件 `outcome: passed` 措辞不一致。按只追加的账本规则，该段没有改写；后续 `0035-b01`、`0036-b01` 两段的结论已与各自的 `outcome` 一致，不需要进一步处理。
+- 候选入口（本轮新增）：Agent Pod 在 `0036-b01` 时仍探测到 443 不可达，人工意见说明要等重新部署后才会生效。若平台重新部署后仍然超时，应由平台提供入口 Service 与 Gateway 状态，作为新的反馈处理；Convergence 未在代码、`Dockerfile` 或 `deployment.json` 中发现与部署契约不符之处。
