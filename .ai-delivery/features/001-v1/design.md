@@ -74,7 +74,7 @@
 | TD-008 | 处理记录表 `ticket_event` 只追加；工单表冗余 `first_resolved_at`、`first_resolved_assignee_id`，仅在为 NULL 时写入 | 报表口径依赖"首次已解决时刻"与"该时刻处理人"（PQ-002 A），冗余列使报表查询简单且不可被后续变更改写 | 每次报表从事件表回放（查询复杂） | FR-020、FR-027、INV-005 |
 | TD-009 | 公司时区配置项 `app.time-zone`，默认 `Asia/Shanghai`；自然周为 ISO 周（周一 00:00 至下周一 00:00，左闭右开） | 已批准技术基线给出默认时区；A-002 规定周一至周日 | 使用服务器默认时区（容器为 UTC，不符合公司本地时间） | FR-026～FR-028、A-002 |
 | TD-010 | 注入 `java.time.Clock` Bean（生产为 `Clock.system(zone)`），所有"当前时刻"均取自该 Clock，不在 SQL 中用 `now()` | 报表与 72 小时边界可在测试中精确构造；测试可把时钟设到独立的历史周以隔离共享库中的其他数据 | SQL `now()`（不可测试） | FR-027、FR-028 |
-| TD-011 | 初始管理员通过运维 SQL 插入（BCrypt 哈希在运维本地生成），应用不内置默认账号、不在启动时生成或输出密码 | 凭据不得写入仓库、日志或镜像；平台不提供项目专用 secret 变量；QA 与功能测试以同样方式自行准备管理员 | 启动时生成随机密码并打印（违反"不记录 secret"）；首次访问设置页（存在抢注窗口且形似自助注册入口）；内置默认密码（不安全） | spec「前置条件」、INT-021 |
+| TD-011 | 按已批准技术基线（方案 A）“初始管理员由启动时的幂等引导逻辑创建”实现：`InitialAdminBootstrap`（`ApplicationRunner`，在 Flyway 迁移之后执行）在单个事务中先取 `pg_advisory_xact_lock(7243011)`，仅当库中不存在任何 `role='ADMIN'` 账号时插入初始管理员（登录名取 `app.bootstrap.admin-login-name`，默认 `admin`；显示姓名取 `app.bootstrap.admin-display-name`，默认 `初始管理员`），`password_hash` 为 NULL；已存在 ADMIN 时不做任何写入，重复启动、多候选并发启动均只产生至多一个引导账号（`ON CONFLICT (login_name) DO NOTHING` 兜底）。首个凭据的提供方式定稿为：运维在本地生成 BCrypt 哈希，以对项目库有写权限的 Entra 身份执行一次 `UPDATE`（仅作用于 `password_hash IS NULL` 的该引导账号），见“支持 Runbook”；`password_hash` 为 NULL 的账号视为禁用，任何密码都无法登录 | 满足基线“启动时幂等引导创建”；首个凭据不进入仓库、镜像、配置、环境变量或日志（明文只在运维本地与安全交付渠道中出现）；平台只注入 `AIDH_DEP_*` 变量，现有依赖类型中没有可承载项目自有机密的类型，因此凭据无法由平台注入应用进程；在凭据设置前账号处于不可登录状态，不存在默认口令或抢注窗口 | 启动时从环境变量/机密读取初始密码（平台不提供项目专用机密注入，`ticket-db` 为 `secret=false`）；启动时生成随机密码并打印到日志（违反宪章“不记录 secret”）；首次访问设置页（spec 未定义该页面，属于新增用户可见行为，且存在抢注窗口、形似自助注册入口）；内置默认密码（不安全）；完全由运维手工 INSERT 整个账号（偏离基线的启动引导决定，未采用） | 技术基线方案 A、spec「前置条件」、INT-021、宪章「安全与隐私」 |
 | TD-012 | 列表分页：每页 50 条，按提交时间倒序、id 倒序；页码导航保留查询条件 | 工单持续增长，整表渲染不可控；分页不减少可见集合 | 无分页（数据增长后页面不可用） | FR-010、FR-014、FR-023 |
 | TD-013 | 表单校验全部在服务端完成，表单加 `novalidate`，不使用 HTML `required` | 必须拒绝"仅含空白"的输入并逐项指出缺失项、保留已填内容；浏览器原生校验无法覆盖空白场景 | 仅浏览器校验（不可信、不满足 FR-007） | FR-007、FR-012、FR-018 |
 | TD-014 | 员工访问他人工单或不存在的工单统一返回 HTTP 403 与同一"无权限访问该工单"页面 | 不泄露他人工单是否存在及任何内容 | 他人工单 403、不存在 404（可被用来探测编号） | FR-013、INV-003 |
@@ -97,11 +97,12 @@
 CREATE TABLE app_user (
   id            BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   login_name    VARCHAR(64)  NOT NULL UNIQUE,
-  password_hash VARCHAR(100) NOT NULL,
+  password_hash VARCHAR(100) NULL,      -- NULL 仅允许出现在启动引导创建、尚未设置首个凭据的 ADMIN 账号上；NULL 视为禁用
   display_name  VARCHAR(100) NOT NULL,
   role          VARCHAR(16)  NOT NULL CHECK (role IN ('EMPLOYEE','IT_STAFF','ADMIN')),
   created_at    TIMESTAMPTZ  NOT NULL,
-  created_by    BIGINT NULL REFERENCES app_user(id)
+  created_by    BIGINT NULL REFERENCES app_user(id),
+  CONSTRAINT ck_app_user_password CHECK (password_hash IS NOT NULL OR role = 'ADMIN')
 );
 
 CREATE TABLE category (
@@ -165,6 +166,7 @@ CREATE INDEX ix_event_ticket ON ticket_event(ticket_id, created_at, id);
 - 类别"移除"= `active=false, removed_at=<now>`（软删除），历史工单保留外键（FR-006）；有效类别名唯一由部分唯一索引保证（INV-007）。名称比较为去除首尾空白后的精确匹配。
 - `ticket_comment`、`ticket_event` 在应用中只有 INSERT 与 SELECT（INV-005、FR-020）。`author_role` 记录写入时身份（FR-019）。
 - `first_resolved_at` / `first_resolved_assignee_id` 只在状态改为 `RESOLVED` 且 `first_resolved_at IS NULL` 时写入，之后不再改变（INV-005、FR-027）；`first_resolved_assignee_id` 为该时刻的 `assignee_id`（可为 NULL，计入"未分配"）。
+- 账号凭据：通过页面创建的账号必须有 BCrypt 哈希；`password_hash IS NULL` 只出现在启动引导创建的初始管理员上（由 `ck_app_user_password` 约束兜底），这类账号在 `AppUserDetailsService` 中返回 `enabled=false`，登录失败提示与凭据错误完全相同（FR-002）。
 - 处理人：`assignee_id` 只能在认领/分派时写入，且写入时目标账号 `role='IT_STAFF'`（INV-002）；身份取消后不清空（FR-004）。
 - 技术长度上限（数据库列宽要求）：登录名 1～64 字符、显示姓名 1～100、初始密码 1～72 字节（BCrypt 上限）、类别名 1～50、标题 1～200、描述/补充说明/回复 1～10000 字符；超限时拒绝并提示"<字段>不能超过 N 个字符"，保留已填内容。所有文本先去除首尾空白再判断是否为空。
 
@@ -193,7 +195,7 @@ src/main/java/com/ithelpdesk/
   HelpdeskApplication.java
   config/      AppProperties(app.time-zone)、ClockConfig、SecurityConfig、WebMvcConfig
   auth/        AppUserDetailsService、CurrentUser(principal: id/loginName/displayName/role)、RoleRefreshFilter、LoginController、HomeController
-  user/        Role、AppUser、UserRepository、UserAdminService、UserAdminController
+  user/        Role、AppUser、UserRepository、UserAdminService、UserAdminController、InitialAdminBootstrap(ApplicationRunner)、BootstrapProperties(app.bootstrap.*)
   category/    Category、CategoryRepository、CategoryService、CategoryAdminController
   ticket/      TicketStatus、Urgency、EventType、Ticket、TicketComment、TicketEvent、TicketRepository、
                TicketCommentRepository、TicketEventRepository、TicketSearchCriteria、TicketQueryService、
@@ -229,7 +231,8 @@ e2e/
 
 ### 关键流程
 
-1. **登录**：`POST /login` → `AppUserDetailsService` 按 `login_name` 精确查询 → BCrypt 校验 → 成功则会话固定攻击防护（新建 Session ID）并跳转 `/`；失败统一跳转 `/login?error`，显示"登录名或密码错误"（FR-002）。
+0. **启动引导**（`InitialAdminBootstrap`，每次进程启动执行一次）：Flyway 迁移完成 → 事务内 `SELECT pg_advisory_xact_lock(7243011)` → `SELECT EXISTS(SELECT 1 FROM app_user WHERE role='ADMIN')` → 为真则结束（不写入、不写日志）→ 为假则 `INSERT INTO app_user(login_name,password_hash,display_name,role,created_at) VALUES(:login,NULL,:display,'ADMIN',:now) ON CONFLICT (login_name) DO NOTHING`；插入成功记录 INFO“已创建初始管理员账号 <登录名>，需按运维手册设置首个凭据”；因登录名被非管理员账号占用而未插入时记录 WARN“初始管理员登录名已被占用，未创建”。引导失败（数据库错误）导致启动失败，由平台重启。日志中不出现任何密码或哈希。
+1. **登录**：`POST /login` → `AppUserDetailsService` 按 `login_name` 精确查询（`password_hash` 为 NULL 时返回禁用用户）→ BCrypt 校验 → 成功则会话固定攻击防护（新建 Session ID）并跳转 `/`；失败统一跳转 `/login?error`，显示"登录名或密码错误"（FR-002）。
 2. **每个已认证请求**：`RoleRefreshFilter`（位于 Security 过滤链 `AuthorizationFilter` 之前）按 Session 中的用户 id 读取 `app_user`；用户不存在则使会话失效并重定向登录；`role` 与 Session 中不同则用新角色重建 `Authentication` 并写回 SecurityContext（FR-004 "下一次操作即生效"）。
 3. **提交工单**（员工）：校验 → 在事务中确认 `category.active=true`（并发移除时拒绝"所选类别已不可用"）→ INSERT `ticket`（`status=OPEN`、`assignee_id=NULL`、`submitted_at=clock.instant()`）→ 重定向详情页并提示"工单已提交"（FR-007、FR-008）。
 4. **补充说明 / 回复**：校验内容 → 员工须为提交人、IT 同事不限 → INSERT `ticket_comment`，不触碰 `ticket.status/assignee_id`（FR-012、FR-018）。
@@ -312,7 +315,7 @@ SQL 结构：`WHERE 1=1` + 可见范围（员工：`submitter_id = :currentUserI
 
 开发者测试与 Independent QA 可以使用各自环境身份直连 `ticket-db`，按上文表结构插入合成数据并按前缀清理：
 
-- 管理员种子：`INSERT INTO app_user(login_name,password_hash,display_name,role,created_at) VALUES(<唯一前缀登录名>, <BCrypt 哈希，$2a$/$2b$/$2y$ 均可>, <姓名>, 'ADMIN', now())`。
+- 管理员种子：`INSERT INTO app_user(login_name,password_hash,display_name,role,created_at) VALUES(<唯一前缀登录名>, <BCrypt 哈希，$2a$/$2b$/$2y$ 均可>, <姓名>, 'ADMIN', now())`。测试与 QA 不得修改或依赖启动引导创建的初始管理员账号（共享库中它可能存在也可能不存在，且没有可用凭据）；断言账号列表时只针对本次运行创建的账号。
 - 回溯时间工单：直接写入 `ticket.submitted_at`；需要"首次已解决"时同时写入 `status`、`first_resolved_at`、`first_resolved_assignee_id` 与对应 `STATUS` 事件，保持与应用写入一致的语义。
 - 清理顺序：`ticket_event` → `ticket_comment` → `ticket` → `category` → `app_user`（按本次运行前缀识别）。
 - 共享库中存在其他交付/候选的数据：断言必须限定在本次运行创建的数据上，或在同一时刻以独立 SQL 计算期望值进行比较。
@@ -327,7 +330,7 @@ SQL 结构：`WHERE 1=1` + 可见范围（员工：`submitter_id = :currentUserI
 - **输入验证**：服务端 Bean Validation + 服务层规则；SQL 全部参数化；Thymeleaf 默认 HTML 转义（`th:text`），禁止 `th:utext` 渲染用户内容；描述与沟通内容以 `white-space: pre-wrap` 展示换行。
 - **安全响应头**：Spring Security 默认头（`X-Content-Type-Options`、`X-Frame-Options: DENY`、`Cache-Control: no-store`）+ `Content-Security-Policy: default-src 'self'`（页面不使用内联脚本）。
 - **数据库身份**：`DefaultAzureCredential`（候选/QA 为工作负载身份，Agent Pod 为 Pod 身份）；令牌受众 `https://ossrdbms-aad.database.windows.net/.default`；无密码、无连接字符串 secret；`docs/dependencies.json` 中 `secret=false`。
-- **初始管理员**：不内置默认账号；由运维/测试按"数据库数据契约"插入 BCrypt 哈希（明文仅存在于操作者本地）。
+- **初始管理员**：由启动时幂等引导逻辑创建（TD-011），创建时无凭据、不可登录；不内置默认密码，不在启动时生成、读取或输出任何密码。首个凭据由运维在本地生成 BCrypt 哈希后以 Entra 身份写入（见“支持 Runbook”），明文只存在于操作者本地与交付给管理员的安全渠道，不进入仓库、镜像、配置、环境变量或日志。生产首次投入使用需要一个对项目库具有写权限的 Entra 身份执行这一步。测试与 QA 用自己的前缀账号按“数据库数据契约”准备管理员。
 - **日志隐私**：不记录请求体、查询参数中的关键词、工单标题/描述/沟通内容、密码、令牌；`RequestLogFilter` 只记录方法、匹配的路由模板、状态码、耗时、用户 id。
 
 ## 配置、可观测性与运维
@@ -347,6 +350,8 @@ SQL 结构：`WHERE 1=1` + 可见范围（员工：`submitter_id = :currentUserI
 | `management.endpoints.web.exposure.include` | `health` |
 | `management.endpoint.health.show-details` | `never` |
 | `app.time-zone` | `Asia/Shanghai` |
+| `app.bootstrap.admin-login-name` | `admin`（非机密） |
+| `app.bootstrap.admin-display-name` | `初始管理员`（非机密） |
 | `spring.thymeleaf.cache` | `true` |
 
 - 应用只从 `AIDH_DEP_TICKET_DB_*` 读取数据库配置，`AIDELIVERY_DELIVERY_ID`、`AIDELIVERY_CANDIDATE_SHA` 只用于候选身份端点；不引入其他项目专用环境变量。
@@ -360,7 +365,7 @@ SQL 结构：`WHERE 1=1` + 可见范围（员工：`submitter_id = :currentUserI
 
 ### 运维要点
 
-- 首个管理员按"支持 Runbook"插入。
+- 应用首次在空库上启动时自动创建无凭据的初始管理员 `admin`；运维按“支持 Runbook”为其设置首个凭据后即可登录。
 - 迁移在启动时自动执行，无需手动操作。
 
 ## SLO、限制、扩缩容、重试与恢复
@@ -394,8 +399,8 @@ SQL 结构：`WHERE 1=1` + 可见范围（员工：`submitter_id = :currentUserI
 |---|---|---|---|---|---|
 | 静态分析（Checkstyle） | Coding 自测 + 候选验证 | Agent Pod / Runner | 无 | `mvn checkstyle:check` 输出 | 候选验证 `staticAnalysis` 通过 |
 | 构建（jar） | Coding 自测 + 候选验证 | Agent Pod / Runner | 无 | `mvn package` 输出 | 候选验证 `build` 通过；ACR Tasks 镜像构建 |
-| 单元/切片测试（校验规则、报表周边界与格式化、授权规则、`RoleRefreshFilter`、关键词转义、`@WebMvcTest` 403/302 行为） | Coding 自测 + 候选验证 | Agent Pod / Runner | 无（数据库以外的纯逻辑，可用替身，不作为功能证据） | `mvn test` 报告 | `developerTests` 通过 |
-| 集成测试（Flyway 迁移可重复执行、仓库 SQL、搜索/筛选组合、员工隔离、认领/分派/状态事务与首次已解决、报表四项口径含 72 小时边界、跨周、再次解决、未分配、已移除类别、无数据） | Coding 自测 + 候选验证 | Agent Pod / Runner，真实 `ticket-db` `dev` 实例 | `AIDH_DEP_TICKET_DB_*` + Pod/Agent 身份 Entra 令牌 | `mvn verify -Pintegration` 报告；运行前缀与清理记录 | `integrationTests` 通过 |
+| 单元/切片测试（校验规则、报表周边界与格式化、授权规则、`RoleRefreshFilter`、关键词转义、`@WebMvcTest` 403/302 行为、`InitialAdminBootstrap` 分支（无 ADMIN 时插入、已有 ADMIN 时不写入）、`AppUserDetailsService` 对 NULL 哈希返回禁用用户） | Coding 自测 + 候选验证 | Agent Pod / Runner | 无（数据库以外的纯逻辑，可用替身，不作为功能证据） | `mvn test` 报告 | `developerTests` 通过 |
+| 集成测试（Flyway 迁移可重复执行、`InitialAdminBootstrapIT`：上下文启动后库中至少存在一个 ADMIN、再次调用引导不改变 ADMIN 数量、以本次运行前缀插入的 NULL 哈希 ADMIN 账号用任意密码登录均失败且提示与凭据错误相同、`ck_app_user_password` 拒绝 NULL 哈希的非 ADMIN 行、仓库 SQL、搜索/筛选组合、员工隔离、认领/分派/状态事务与首次已解决、报表四项口径含 72 小时边界、跨周、再次解决、未分配、已移除类别、无数据） | Coding 自测 + 候选验证 | Agent Pod / Runner，真实 `ticket-db` `dev` 实例 | `AIDH_DEP_TICKET_DB_*` + Pod/Agent 身份 Entra 令牌 | `mvn verify -Pintegration` 报告；运行前缀与清理记录 | `integrationTests` 通过 |
 | 功能测试（localhost 启动应用，Playwright Chromium 以三种身份走通 IQA-001～IQA-014 对应流程） | Coding 自测 + 候选验证 | Agent Pod / Runner，localhost:8080 + `dev` 实例 | 同上；管理员种子由 `e2e/support/db.ts` 插入 | `developer-functional-run.sh` 输出与 Playwright 报告 | `functionalTests` 通过 |
 | 候选部署校验（镜像非 root、health、candidate-identity） | 候选验证 | 平台 `cand-{deliveryShortId}` + `test` 实例 | 候选工作负载身份 | 无（平台执行） | 平台部署记录 |
 | Independent QA 验收 IQA-001～IQA-015 | Independent QA | 已部署候选 HTTPS 地址 + `test` 实例 | QA 工作负载身份；QA 自行插入管理员与回溯数据 | 无（Coding 不编写 `qa-run.sh`） | `qa-result.json` |
@@ -428,7 +433,8 @@ curl -s localhost:8080/api/candidate-identity
 
 | 现象 | 排查 | 处置 |
 |---|---|---|
-| 首次投入使用无法登录（无管理员） | 查询 `SELECT count(*) FROM app_user WHERE role='ADMIN'` | 运维在本地生成 BCrypt 哈希（如 `htpasswd -bnBC 10 "" '<密码>' \| tr -d ':\n'`），以有权限的 Entra 身份连接项目库执行：`INSERT INTO app_user(login_name,password_hash,display_name,role,created_at) VALUES('<登录名>','<哈希>','<姓名>','ADMIN',now());`；密码通过安全渠道交给管理员，不写入仓库、工单或日志 |
+| 首次投入使用：设置初始管理员首个凭据 | 应用启动日志出现“已创建初始管理员账号 admin”；或查询 `SELECT login_name, password_hash IS NULL AS pending FROM app_user WHERE role='ADMIN'` | 运维在本地生成 BCrypt 哈希（如 `htpasswd -bnBC 10 "" '<密码>' \| tr -d ':\n'`），以对项目库有写权限的 Entra 身份连接项目库执行：`UPDATE app_user SET password_hash='<哈希>' WHERE login_name='admin' AND role='ADMIN' AND password_hash IS NULL;`（影响 1 行即完成；0 行表示已设置过或登录名被改配置）；密码通过安全渠道交给管理员，不写入仓库、工单或日志 |
+| 首次投入使用无法登录且库中没有任何 ADMIN | 查看启动日志是否有“初始管理员登录名已被占用，未创建” | 修改 `app.bootstrap.admin-login-name` 为未占用的登录名后重新部署，引导逻辑会创建该账号，再按上一行设置首个凭据 |
 | 启动失败、health 不通 | 查看容器日志中 Flyway 或连接错误 | 连接/令牌错误：确认依赖绑定与工作负载身份权限（平台依赖绑定节点）；迁移校验失败：检查是否有人修改了已应用的迁移文件，按"只增不删"新增修正迁移 |
 | 间歇性数据库连接认证失败 | 日志中 PostgreSQL 认证错误 | 确认 `maxLifetime` 小于令牌有效期；检查身份令牌获取是否受限 |
 | 用户反映身份变更未生效 | 查询该账号 `role` | `RoleRefreshFilter` 每请求刷新；若库中已是新值，请用户刷新页面 |

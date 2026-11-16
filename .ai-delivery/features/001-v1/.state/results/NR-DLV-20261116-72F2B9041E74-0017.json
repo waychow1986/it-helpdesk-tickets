@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0017",
+  "stage": "technical-solution",
+  "outcome": "passed",
+  "summary": "按门禁 TSG-001 选择方案（A）修订 design.md：初始管理员改为按已批准技术基线由启动时幂等引导逻辑创建（无凭据、禁用状态），首个凭据由运维本地生成 BCrypt 哈希后以 Entra 身份 UPDATE 写入，并同步更新 TD-011、表结构约束、启动流程、组件、配置、安全、数据契约、验证责任矩阵与 Runbook；docs/dependencies.json 未变更。",
+  "artifacts": [
+    { "path": ".ai-delivery/features/001-v1/design.md" }
+  ]
+}
