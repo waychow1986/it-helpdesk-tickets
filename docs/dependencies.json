@@ -14,5 +14,31 @@
         "test": true
       }
     }
+  ],
+  "secrets": [
+    {
+      "name": "INITIAL_ADMIN_LOGIN_NAME",
+      "purpose": "测试环境唯一初始管理员的登录名，由业务方提供，供 Independent QA 在 IQA-016 情形①经“设置初始管理员”流程填写、情形②及其他场景登录使用（人工审批意见 HT-DLV-20261116-72F2B9041E74-0016）；应用不读取。",
+      "environments": [
+        "test"
+      ],
+      "required": true
+    },
+    {
+      "name": "INITIAL_ADMIN_PASSWORD",
+      "purpose": "测试环境唯一初始管理员的登录凭据（密码），由业务方提供，QA 与 UAT 共用；应用不读取，不得出现在证据明文中。",
+      "environments": [
+        "test"
+      ],
+      "required": true
+    },
+    {
+      "name": "INITIAL_ADMIN_DISPLAY_NAME",
+      "purpose": "测试环境唯一初始管理员的姓名，由业务方提供，供 IQA-016 情形①设置流程填写；应用不读取。",
+      "environments": [
+        "test"
+      ],
+      "required": true
+    }
   ]
 }

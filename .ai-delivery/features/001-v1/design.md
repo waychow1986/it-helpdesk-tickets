@@ -3,7 +3,7 @@
 ## 技术上下文（Technical Context）
 
 - **交付**：DLV-20261116-72F2B9041E74 V1 · 内部 IT 工单系统；权威输入为 `intent.md`（INT-001～INT-024）、`spec.md`（FR-001～FR-031、NFR-001～NFR-002、IQA-001～IQA-016）与已批准的 `technical-baseline.md`（方案 A）。
-- **仓库现状**：已按本方案上一版完成首轮实现（`pom.xml`、`src/`、`e2e/`、根目录 `Dockerfile`），见 `reports/implementation.md`。本版只因 spec 新增 FR-031 / IQA-016 / AC-021（一次性“设置初始管理员”流程，人工审批意见 HT-DLV-20261116-72F2B9041E74-0011、PQ-003 人工答案 A）及 IQA-015 执行方式改为以 QD-001 人工答案为准（PQ-004 人工答案 C）而修订：TD-011 由“启动引导 + 运维写入首个凭据”改为登录入口的一次性设置流程，新增 TD-016（开发者测试的独立 schema），并同步路由、配置、验证矩阵与 Runbook；并按人工澄清答案 HT-DLV-20261116-72F2B9041E74-0014（DEC-TS-001 选 D）新增 TD-017：数据作用域就是应用配置所指向的数据库（由平台注入的 `AIDH_DEP_TICKET_DB_*` 决定），不按候选或交付派生 schema，`/setup` 开放判定以该数据库中是否已有可用管理员为准；IQA-015 与 IQA-016 的验收口径随该答案回退 specification 修订；其余设计不变。
+- **仓库现状**：已按本方案上一版完成首轮实现（`pom.xml`、`src/`、`e2e/`、根目录 `Dockerfile`），见 `reports/implementation.md`。本版只因 spec 新增 FR-031 / IQA-016 / AC-021（一次性“设置初始管理员”流程，人工审批意见 HT-DLV-20261116-72F2B9041E74-0011、PQ-003 人工答案 A）及 IQA-015 执行方式改为以 QD-001 人工答案为准（PQ-004 人工答案 C）而修订：TD-011 由“启动引导 + 运维写入首个凭据”改为登录入口的一次性设置流程，新增 TD-016（开发者测试的独立 schema），并同步路由、配置、验证矩阵与 Runbook；并按人工澄清答案 HT-DLV-20261116-72F2B9041E74-0014（DEC-TS-001 选 D）新增 TD-017：数据作用域就是应用配置所指向的数据库（由平台注入的 `AIDH_DEP_TICKET_DB_*` 决定），不按候选或交付派生 schema，`/setup` 开放判定以该数据库中是否已有可用管理员为准；IQA-015 与 IQA-016 的验收口径已随该答案在 specification 中修订；并按人工审批意见 HT-DLV-20261116-72F2B9041E74-0016 新增 TD-018：测试环境唯一初始管理员的登录名、凭据和姓名以 `test` 环境应用机密（`docs/dependencies.json` 的 `secrets`）交给 Independent QA，QA 不再插入管理员种子；其余设计不变。
 - **技术栈（定稿）**：
   - 语言与运行时：Java 21（Eclipse Temurin 21）。
   - 框架：Spring Boot 3.5.x（取当时最新补丁版本，由 `spring-boot-starter-parent` 统一管理版本）：Spring MVC + Thymeleaf 服务端渲染、Spring Security（表单登录 + HttpSession + CSRF）、Spring JDBC（`NamedParameterJdbcTemplate`）、Flyway、Spring Boot Actuator、Bean Validation。
@@ -11,7 +11,7 @@
   - 构建：Maven 3（Pod 预装），单模块 jar；静态分析 Checkstyle（`maven-checkstyle-plugin`）。
   - 测试：JUnit 5 + Spring Boot Test + AssertJ（单元与 Web 切片测试）、Maven Failsafe（连接 `dev` 实例的集成测试）、Node 22 + `@playwright/test`（Chromium，localhost 功能测试）。
 - **运行形态**：单进程、单容器、单副本；监听 HTTP `8080`；TLS 由平台网关终止。
-- **外部依赖**：仅 `ticket-db` 一个（见 `docs/dependencies.json`）；不使用任何其他云服务、消息、缓存、遥测后端或身份产品。
+- **外部依赖**：仅 `ticket-db` 一个（见 `docs/dependencies.json`）；另在同一文件 `secrets` 中声明仅用于 `test` 环境 Independent QA 的初始管理员凭据（TD-018），应用不读取；不使用任何其他云服务、消息、缓存、遥测后端或身份产品。
 
 ## 治理与技术约束
 
@@ -33,8 +33,9 @@
 | 平台：Agent Pod 无 Docker 守护进程 | 测试方式 | 不用 Testcontainers；集成测试直连 `dev` 实例 |
 | 平台：`requiresPrivateNetwork` 只能为 false | 部署 | 设为 false |
 | 人工审批意见 HT-DLV-20261116-72F2B9041E74-0011、PQ-003 人工答案 A（FR-031、SC-007、AC-021） | 业务方无需任何人手工修改数据或配置即可获得初始管理员凭据；一次性流程，完成后永久不可用，不构成自助注册 | 登录入口的 `/setup` 流程（TD-011）；可用性只由应用所连数据库（TD-017）中是否已有可用管理员（“带凭据的 ADMIN”）决定，事务内 advisory lock 串行；无运维 Runbook、无配置项参与。此决定取代已批准技术基线中“初始管理员由启动时幂等引导逻辑创建”的实现方式（基线该条目的前提是 spec 未定义设置页面，现已由 FR-031 定义） |
-| 平台：`test` 库由多个交付与候选共享，不得假设库为空；不得人工改库改配置，不为产品增加测试后门（FR-031、IQA-016、SC-007）；人工澄清答案 HT-DLV-20261116-72F2B9041E74-0014（DEC-TS-001 选 D） | 数据作用域就是应用配置所指向的数据库，生产与测试行为一致，作用域不依赖部署身份；首次设置在空库上的完整行为由开发阶段自动化测试覆盖；在已有管理员的环境中，候选验证“入口不可见、直接访问被拒、不能新增或接管账号” | TD-017：候选、QA、生产都使用依赖注入的数据库的默认 `public` schema，不读取 `AIDELIVERY_*` 决定数据位置；开放判定 = 该数据库中不存在可用管理员；首次设置完整流程由开发者集成/功能测试在一次性 schema（TD-016，真实 `dev` 实例）上验证；Independent QA 按修订后的 IQA-016 前置条件执行（需回退 specification 修订 IQA-016 文本）；无任何测试后门 |
-| QD-001 人工答案原文（经 HT-DLV-20261116-72F2B9041E74-0014 转达）：“V1 不验证升级或重新部署后的数据保留，改到后续迭代通过真实升级来验证”（IQA-015 / AC-020） | V1 Independent QA 不执行升级或重新部署后的数据保留验证；需回退 specification 在规格中直接写明 | 设计仍按 FR-029、FR-030、NFR-001 保证数据保留能力：迁移只增不删、可重复执行、启动不写入任何数据、`/setup` 在已有可用管理员时保持关闭；开发者集成测试提供迁移可重复执行与不删数据的证据；V1 验证矩阵不安排 IQA-015 的候选环境升级验证 |
+| 平台：`test` 库由多个交付与候选共享，不得假设库为空；不得人工改库改配置，不为产品增加测试后门（FR-031、IQA-016、SC-007）；人工澄清答案 HT-DLV-20261116-72F2B9041E74-0014（DEC-TS-001 选 D） | 数据作用域就是应用配置所指向的数据库，生产与测试行为一致，作用域不依赖部署身份；首次设置在空库上的完整行为由开发阶段自动化测试覆盖；在已有管理员的环境中，候选验证“入口不可见、直接访问被拒、不能新增或接管账号” | TD-017：候选、QA、生产都使用依赖注入的数据库的默认 `public` schema，不读取 `AIDELIVERY_*` 决定数据位置；开放判定 = 该数据库中不存在可用管理员；首次设置完整流程由开发者集成/功能测试在一次性 schema（TD-016，真实 `dev` 实例）上验证；Independent QA 按 spec 修订后的 IQA-016 情形 ①/② 执行；无任何测试后门 |
+| 人工审批意见 HT-DLV-20261116-72F2B9041E74-0016（IQA-001、IQA-016、AC-001、AC-021） | 测试环境只有一个初始管理员，凭据由业务方人工提供，QA 与 UAT 共用；QA 不自备或插入管理员账号，员工与 IT 同事账号由该管理员通过产品功能创建；凭据交付方式由技术方案决定；凭据不得出现在证据明文中 | TD-018：在 `docs/dependencies.json` 声明 `test` 环境机密 `INITIAL_ADMIN_LOGIN_NAME`、`INITIAL_ADMIN_PASSWORD`、`INITIAL_ADMIN_DISPLAY_NAME`，由人在依赖与机密任务中提供，平台以 `AIDH_SECRET_*` 注入 QA；应用代码不读取这些变量，初始管理员只能经 `/setup`（情形 ①，由 QA 用这份凭据填写）进入系统；删除“QA 插入管理员种子”的数据准备方式 |
+| QD-001 人工答案原文（经 HT-DLV-20261116-72F2B9041E74-0014 转达）：“V1 不验证升级或重新部署后的数据保留，改到后续迭代通过真实升级来验证”（IQA-015 / AC-020） | V1 Independent QA 不执行升级或重新部署后的数据保留验证（spec 已在 IQA-015、AC-020 与测试策略中写明） | 设计仍按 FR-029、FR-030、NFR-001 保证数据保留能力：迁移只增不删、可重复执行、启动不写入任何数据、`/setup` 在已有可用管理员时保持关闭；开发者集成测试提供迁移可重复执行与不删数据的证据；V1 验证矩阵不安排 IQA-015 的候选环境升级验证 |
 
 ## 架构概览（Architecture）
 
@@ -84,6 +85,7 @@
 | TD-015 | 功能测试用 Node `@playwright/test` 驱动 Pod 预装 Chromium；测试数据准备用 Node `pg` + `@azure/identity` 直连 `dev` 库 | Pod 预装 Node Playwright 与 Chromium；Java Playwright 需额外下载驱动 | Java Playwright；Selenium | IQA-001～IQA-016 的开发者对应验证 |
 | TD-016 | 数据库 schema 可配置：应用属性 `app.db.schema`（默认 `public`，启动时校验匹配 `^[a-z][a-z0-9_]{0,62}$`，否则启动失败），同时作用于 JDBC `currentSchema` 与 Flyway `schemas`/`default-schema`。候选、QA、生产从不设置该属性，始终使用 `public`（TD-017）；只有开发者的“设置初始管理员”集成测试与功能测试以命令行/测试属性设为一次性 schema（`it_setup_<runId>`、`e2e_setup_<runId>`，由 Flyway 自动创建），测试结束以 `DROP SCHEMA <name> CASCADE` 清理。上一版 Flyway 已能在 `dev`/`test` 项目库中建表，说明使用方角色对项目库有建对象权限；Coding 在 `dev` 实例上先验证能创建并删除一次性 schema，若被拒绝，按平台规则以 `decisionsNeeded`（`dependency.name=ticket-db`）提出，不改用替身 | FR-031 的验证需要“尚无带凭据 ADMIN”的起始状态，而共享 `dev` 库的 `public` schema 中存在其他测试的种子管理员；一次性 schema 给出真实 PostgreSQL 上的干净状态，不删除他人数据、不使用替身；不改变产品行为 | 测试前删除库中全部 ADMIN（破坏共享数据）；只做单元测试（不满足真实集成验证）；为 `/setup` 增加测试专用开关（引入产品之外的行为） | FR-031、IQA-016、宪章「测试与质量」 |
 | TD-017 | 数据作用域 = 应用配置所指向的数据库（人工澄清答案 HT-DLV-20261116-72F2B9041E74-0014，DEC-TS-001 选 D）：候选、QA、生产都连接平台注入的 `AIDH_DEP_TICKET_DB_*` 数据库，使用默认 `public` schema；不读取 `AIDELIVERY_DELIVERY_ID`、`AIDELIVERY_CANDIDATE_SHA` 或任何部署身份来决定 schema；`/setup` 开放判定 = 该数据库中是否已有可用管理员（TD-011 判定 SQL）。删除上一版设计中按部署身份派生 schema 的规则与 `/api/candidate-identity` 的 `dataSchema` 字段（未实现的不实现，已实现的删除）。`app.db.schema` 只保留给开发者测试（TD-016）。在共享 `test` 库中已有可用管理员（来自其他交付、候选或业务方 UAT）是预期状态：此时候选按修订后的 IQA-016 验证“入口不可见、直接访问被拒、不能新增或接管账号”；首次设置在空库上的完整行为由开发者集成与功能测试在真实 `dev` 实例的一次性 schema 中覆盖 | 人选定：生产与测试行为必须一致，作用域不能依赖部署身份；FR-031“设置成功后永久不可用”按数据库语义完全保持；无测试后门；架构最简单 | 按候选版本或交付派生 schema（DEC-TS-001 A/B，人未选）；每候选独立数据库实例（C，人未选，平台不提供）；QA 删除他人管理员以重新开放（破坏共享数据、违反平台规则） | FR-031、FR-030、SC-007、IQA-015、IQA-016、HT-0014 |
+| TD-018 | 测试环境初始管理员凭据交付（人工审批意见 HT-DLV-20261116-72F2B9041E74-0016）：在 `docs/dependencies.json` 顶层 `secrets` 声明 `INITIAL_ADMIN_LOGIN_NAME`、`INITIAL_ADMIN_PASSWORD`、`INITIAL_ADMIN_DISPLAY_NAME`，`environments=["test"]`、`required=true`；值由业务方在平台依赖与机密任务中提供，平台注入为 `AIDH_SECRET_INITIAL_ADMIN_LOGIN_NAME` 等，供 Independent QA 使用（业务方 UAT 使用自己提供的同一份凭据）。应用（`src/main/**`）不读取任何 `AIDH_SECRET_*`，即使候选容器中存在这些变量也不据此创建或修改账号：初始管理员只能经 `/setup` 进入系统（TD-011）。QA 情形 ① 用这份凭据填写 `/setup`，情形 ② 用它登录；其他场景的员工与 IT 同事账号由该管理员经账号管理页面创建与设置（FR-001、FR-004）；QA 不以 SQL 写入任何 `app_user` 行。开发者测试（`dev`）不使用这些机密，仍自行生成合成管理员 | 人要求凭据由业务方提供并由 QA 与 UAT 共用，交付方式由技术方案决定；平台 `secrets` 是人向 QA 提供值的唯一受支持通道，无需流程外传递，不落入仓库、日志或证据；应用不读取，保证“无需改数据或配置”与 `/setup` 一次性语义不变 | 应用启动时用机密自动创建管理员（违反 FR-031 一次性设置流程与 HT-0011，且使情形 ① 不可验证）；把凭据写入仓库或 QA 计划（泄露机密）；QA 插入管理员种子（HT-0016 禁止） | FR-001、FR-004、FR-031、AC-001、AC-021、IQA-001、IQA-016、HT-0016、宪章「安全与隐私」 |
 
 ## 领域与数据模型
 
@@ -326,14 +328,15 @@ SQL 结构：`WHERE 1=1` + 可见范围（员工：`submitter_id = :currentUserI
 
 ### 数据库数据契约（供测试准备数据）
 
-开发者测试与 Independent QA 可以使用各自环境身份直连 `ticket-db`，按上文表结构在应用所用的 `public` schema 中插入合成数据并按前缀清理（开发者的一次性 schema 只用于 TD-016 所列测试）：
+开发者测试与 Independent QA 可以使用各自环境身份直连 `ticket-db`，按上文表结构在应用所用的 `public` schema 中准备合成数据并按前缀清理（开发者的一次性 schema 只用于 TD-016 所列测试）；Independent QA 不向 `app_user` 写入任何行（HT-0016、TD-018）：
 
 - 管理员种子（仅开发者测试在 `dev` 库 `public` schema 中使用）：`INSERT INTO app_user(login_name,password_hash,display_name,role,created_at) VALUES(<唯一前缀登录名>, <BCrypt 哈希，$2a$/$2b$/$2y$ 均可>, <姓名>, 'ADMIN', now())`。断言账号列表时只针对本次运行创建的账号；遗留的 NULL 哈希 ADMIN 行不得修改或依赖。
 - “设置初始管理员”开放判定：应用所连数据库（`public` schema）中不存在 `role='ADMIN' AND password_hash IS NOT NULL` 的行（TD-011、TD-017）。共享 `dev`/`test` 库中可能已有其他交付、候选、开发者测试或业务方 UAT 创建的可用管理员，这是预期状态，测试不得删除或修改他人账号以改变判定。
-- IQA-016 在候选环境中的前置状态与执行方式（按人工澄清答案 HT-0014，需 specification 修订 IQA-016 后生效）：QA 先读取登录页判断入口是否显示——① 尚无可用管理员（首次部署到空库）时，验证首次设置完整流程，所设初始管理员属本次 QA 数据；② 已有可用管理员时（共享库的常态），验证登录页不显示入口、`GET /setup` 与 `POST /setup`（含一组新凭据）均得 403、该组凭据登录失败、账号数据无新增或修改（QA 可直连 `test` 库只读核对）。QA 不得为获得任一状态改库或改配置。其他场景所需管理员：情形 ① 由初始管理员在系统内创建；情形 ② 由 QA 按“管理员种子”方式以本次运行前缀插入并在结束时清理（与开发者测试相同的测试数据准备，不是产品功能）。
-- 管理员种子同样适用于 Independent QA 在 `test` 库 `public` schema 中准备数据。
-- 回溯时间工单：直接写入 `ticket.submitted_at`；需要"首次已解决"时同时写入 `status`、`first_resolved_at`、`first_resolved_assignee_id` 与对应 `STATUS` 事件，保持与应用写入一致的语义。
-- 清理顺序：`ticket_event` → `ticket_comment` → `ticket` → `category` → `app_user`（按本次运行前缀识别）。
+- IQA-016 在候选环境中的前置状态与执行方式（spec IQA-016，HT-0014、HT-0016）：QA 最先执行 IQA-016，先读取登录页判断入口是否显示——① 尚无可用管理员（首次部署到空库）时，验证首次设置完整流程，留空提交被拒后用 `AIDH_SECRET_INITIAL_ADMIN_LOGIN_NAME`、`AIDH_SECRET_INITIAL_ADMIN_PASSWORD`、`AIDH_SECRET_INITIAL_ADMIN_DISPLAY_NAME` 完成设置，覆盖尝试使用合成信息；② 已有可用管理员时，验证登录页不显示入口、`GET /setup` 与 `POST /setup`（一组合成凭据，以及以 `AIDH_SECRET_INITIAL_ADMIN_LOGIN_NAME` 为登录名的提交）均得 403、合成凭据登录失败、账号数据无新增或修改（QA 可直连 `test` 库只读核对 `app_user` 行数与该登录名行的 `password_hash`、`role`、`display_name` 未变）、用机密中的凭据仍可登录。QA 不得为获得任一状态改库或改配置。所设初始管理员是测试环境长期保留的唯一初始管理员，QA 与 UAT 共用，QA 不清理该账号。
+- 其他场景的账号：员工与 IT 同事账号由 QA 以初始管理员身份在账号管理页面创建（登录名带本次运行前缀），身份变更同样经页面完成；IQA-001 中“创建管理员账号”一步同样经页面完成。产品不提供删除账号功能，这些前缀账号保留在 `test` 库中，后续运行以新前缀区分；QA 不以 SQL 删除或修改 `app_user` 行。
+- 若情形 ② 中机密凭据无法登录（库中可用管理员不是业务方提供的那一个），属于执行环境问题：QA 按平台归类写诊断证据，`passed=false` 且 defects、testGaps 为空，不改库以绕过；处置见支持 Runbook。
+- 回溯时间工单（引用经页面创建的前缀账号的 `app_user.id`）：直接写入 `ticket.submitted_at`；需要"首次已解决"时同时写入 `status`、`first_resolved_at`、`first_resolved_assignee_id` 与对应 `STATUS` 事件，保持与应用写入一致的语义。
+- 清理顺序：`ticket_event` → `ticket_comment` → `ticket` → `category` → `app_user`（按本次运行前缀识别）；Independent QA 只按本次运行前缀清理它写入的工单、沟通、处理记录与类别，不删除或修改任何 `app_user` 行。
 - 共享库中存在其他交付/候选的数据：断言必须限定在本次运行创建的数据上，或在同一时刻以独立 SQL 计算期望值进行比较。
 
 ## 安全、隐私、身份与 Secret
@@ -347,6 +350,7 @@ SQL 结构：`WHERE 1=1` + 可见范围（员工：`submitter_id = :currentUserI
 - **安全响应头**：Spring Security 默认头（`X-Content-Type-Options`、`X-Frame-Options: DENY`、`Cache-Control: no-store`）+ `Content-Security-Policy: default-src 'self'`（页面不使用内联脚本）。
 - **数据库身份**：`DefaultAzureCredential`（候选/QA 为工作负载身份，Agent Pod 为 Pod 身份）；令牌受众 `https://ossrdbms-aad.database.windows.net/.default`；无密码、无连接字符串 secret；`docs/dependencies.json` 中 `secret=false`。
 - **初始管理员**（TD-011、TD-017）：由业务方在尚无可用管理员的数据库首次部署后，在登录入口通过一次性 `/setup` 流程自行设置，无需任何人改库或改配置，也无默认密码、启动生成密码或运维 Runbook。密码只在请求内存中做 BCrypt 哈希，不回显（校验失败重渲染时密码框清空）、不记录日志。流程开放期间任何能访问登录页的人都可完成设置（这是 PQ-003 A 选定的行为），因此部署后应由业务方尽快完成设置；完成后流程永久关闭。`POST /setup` 受全局 CSRF 保护。
+- **测试环境初始管理员机密**（TD-018）：`INITIAL_ADMIN_*` 只在 `test` 环境注入，只供 Independent QA 使用；应用代码不引用 `AIDH_SECRET_*`（Coding 以单元测试/静态检查确认 `src/main/**` 中无该前缀）；QA 截图、录屏、日志与结果文件中不得出现凭据明文（密码框遮挡，结果只断言“已提供”）。
 - **日志隐私**：不记录请求体、查询参数中的关键词、工单标题/描述/沟通内容、密码、令牌；`RequestLogFilter` 只记录方法、匹配的路由模板、状态码、耗时、用户 id。
 
 ## 配置、可观测性与运维
@@ -370,7 +374,7 @@ SQL 结构：`WHERE 1=1` + 可见范围（员工：`submitter_id = :currentUserI
 | `app.time-zone` | `Asia/Shanghai` |
 | `spring.thymeleaf.cache` | `true` |
 
-- 应用只从 `AIDH_DEP_TICKET_DB_*`（`HOST`、`PORT`、`DATABASE`、`USER`）读取数据库配置，`AIDELIVERY_DELIVERY_ID`、`AIDELIVERY_CANDIDATE_SHA` 只用于候选身份端点，不影响数据位置（TD-017）；不引入其他项目专用环境变量。
+- 应用只从 `AIDH_DEP_TICKET_DB_*`（`HOST`、`PORT`、`DATABASE`、`USER`）读取数据库配置，`AIDELIVERY_DELIVERY_ID`、`AIDELIVERY_CANDIDATE_SHA` 只用于候选身份端点，不影响数据位置（TD-017）；不引入其他项目专用环境变量；不读取 `AIDH_SECRET_*`（TD-018）。
 - 容器 JVM 参数：`-XX:MaxRAMPercentage=75`。
 
 ### 可观测性
@@ -420,9 +424,9 @@ SQL 结构：`WHERE 1=1` + 可见范围（员工：`submitter_id = :currentUserI
 | 集成测试（Flyway 迁移可重复执行且不删除已有数据、`/api/candidate-identity` 只返回 `deliveryId` 与 `candidateSha`；`InitialAdminSetupIT`（一次性 schema `it_setup_<runId>`，TD-016）：空 schema 迁移后开放、启动不写入任何账号、必填项为空不创建且仍开放、成功创建 BCrypt 哈希 ADMIN 后关闭、关闭后再提交不新增或修改任何行、两个并发提交只成功一个、遗留 NULL 哈希 ADMIN 行不影响开放判定且不被修改、结束 `DROP SCHEMA ... CASCADE`；`public` schema 中以本次运行前缀插入的 NULL 哈希 ADMIN 账号用任意密码登录均失败且提示与凭据错误相同、`ck_app_user_password` 拒绝 NULL 哈希的非 ADMIN 行、仓库 SQL、搜索/筛选组合、员工隔离、认领/分派/状态事务与首次已解决、报表四项口径含 72 小时边界、跨周、再次解决、未分配、已移除类别、无数据） | Coding 自测 + 候选验证 | Agent Pod / Runner，真实 `ticket-db` `dev` 实例 | `AIDH_DEP_TICKET_DB_*` + Pod/Agent 身份 Entra 令牌 | `mvn verify -Pintegration` 报告；运行前缀与清理记录 | `integrationTests` 通过 |
 | 功能测试（localhost 启动应用，Playwright Chromium 以三种身份走通 IQA-001～IQA-014 对应流程；另在 localhost:8081 以一次性 schema `e2e_setup_<runId>` 启动第二个实例，走通 IQA-016 对应流程：登录页有入口且无注册入口、留空提交被拒、完成设置、登录并创建员工/新增类别/打开周报表、退出后入口不显示、直接访问 `/setup` 得 403、用另一组凭据提交被拒且该凭据登录失败、原管理员仍可登录、页面不回显密码） | Coding 自测 + 候选验证 | Agent Pod / Runner，localhost:8080 / 8081 + `dev` 实例 | 同上；8080 实例的管理员种子由 `e2e/support/db.ts` 插入；8081 实例不插入任何数据 | `developer-functional-run.sh` 输出与 Playwright 报告 | `functionalTests` 通过 |
 | 候选部署校验（镜像非 root、health、candidate-identity） | 候选验证 | 平台 `cand-{deliveryShortId}` + `test` 实例 | 候选工作负载身份 | 无（平台执行） | 平台部署记录 |
-| Independent QA 验收 IQA-001～IQA-016 | Independent QA | 已部署候选 HTTPS 地址 + `test` 实例（`public` schema） | QA 工作负载身份；IQA-016 先执行；其他场景的管理员按“数据库数据契约”获得；QA 可自行插入回溯时间的工单数据 | 无（Coding 不编写 `qa-run.sh`） | `qa-result.json` |
-| IQA-015 升级或重新部署后数据保留 | V1 不在候选环境中验证（QD-001 人工答案原文：“V1 不验证升级或重新部署后的数据保留，改到后续迭代通过真实升级来验证”；需 specification 写明） | 无（后续迭代以真实升级验证） | 无 | 集成测试证明迁移可重复执行、不删数据、启动不写入数据（辅助证据，不替代验收） | 后续迭代 |
-| IQA-016 初始管理员设置（首次设置 / 已设置后的关闭行为） | 首次设置完整流程：Coding 自测 + 候选验证（`InitialAdminSetupIT` 与 8081 功能测试，真实 `dev` 实例一次性空 schema）；候选环境：Independent QA 按“数据库数据契约”中的情形 ①/② 执行 | 一次性 schema（`dev`）；已部署候选 + `test` 实例 | 不预先插入或修改任何账号数据或配置以影响开放判定 | `mvn verify -Pintegration` 与 Playwright 报告 | `qa-result.json` 中 IQA-016 |
+| Independent QA 验收 IQA-001～IQA-014、IQA-016 | Independent QA | 已部署候选 HTTPS 地址 + `test` 实例（`public` schema） | QA 工作负载身份 + `AIDH_SECRET_INITIAL_ADMIN_*`（TD-018）；IQA-016 先执行；员工、IT 同事及 IQA-001 的管理员账号由初始管理员经页面创建，不以 SQL 写入账号；QA 可自行插入回溯时间的工单数据 | 无（Coding 不编写 `qa-run.sh`） | `qa-result.json` |
+| IQA-015 升级或重新部署后数据保留 | V1 不在候选环境中验证（spec IQA-015、AC-020：“V1 不验证升级或重新部署后的数据保留，改到后续迭代通过真实升级来验证”，HT-0014） | 无（后续迭代以真实升级验证） | 无 | 集成测试证明迁移可重复执行、不删数据、启动不写入数据（辅助证据，不替代验收） | 后续迭代 |
+| IQA-016 初始管理员设置（首次设置 / 已设置后的关闭行为） | 首次设置完整流程：Coding 自测 + 候选验证（`InitialAdminSetupIT` 与 8081 功能测试，真实 `dev` 实例一次性空 schema）；候选环境：Independent QA 按“数据库数据契约”中的情形 ①/② 执行 | 一次性 schema（`dev`）；已部署候选 + `test` 实例 | 不预先插入或修改任何账号数据或配置以影响开放判定；候选环境中初始管理员凭据来自 `AIDH_SECRET_INITIAL_ADMIN_*`（TD-018） | `mvn verify -Pintegration` 与 Playwright 报告 | `qa-result.json` 中 IQA-016 |
 
 替身使用说明：`dev`、`test` 均声明 `realInstance=true`，集成测试与功能测试不得使用数据库替身；单元测试中的替身只用于纯逻辑，不计入 functional/integration 证据。
 
@@ -453,6 +457,7 @@ curl -s localhost:8080/api/candidate-identity
 | 现象 | 排查 | 处置 |
 |---|---|---|
 | 新部署环境无人能登录 | 打开登录页，看是否显示“设置初始管理员” | 显示：由业务方点击完成设置后登录（无需运维改库或改配置）；不显示：所连数据库中已有可用管理员，请联系已有管理员 |
+| Independent QA 情形 ② 中业务方提供的初始管理员凭据无法登录 | QA 证据中登录失败截图；只读查询 `test` 库中 `role='ADMIN' AND password_hash IS NOT NULL` 的登录名是否与机密登录名一致 | 机密值与已设置账号不一致：由业务方在平台依赖与机密任务中更正机密值；库中已有他人设置的管理员：由人决定改绑一个尚无可用管理员的 `test` 库（平台依赖绑定），不改库、不重开 `/setup` |
 | 业务方访问 `/setup` 得到“此入口不可用” | 预期行为：所连数据库中已有可用管理员（FR-031） | 使用已有管理员账号登录；应用不提供重新开放该流程的方式 |
 | 启动失败、health 不通 | 查看容器日志中 Flyway 或连接错误 | 连接/令牌错误：确认依赖绑定与工作负载身份权限（平台依赖绑定节点）；迁移校验失败：检查是否有人修改了已应用的迁移文件，按"只增不删"新增修正迁移 |
 | 间歇性数据库连接认证失败 | 日志中 PostgreSQL 认证错误 | 确认 `maxLifetime` 小于令牌有效期；检查身份令牌获取是否受限 |
@@ -462,4 +467,4 @@ curl -s localhost:8080/api/candidate-identity
 
 ## 开放决策
 
-- 无未决技术决定。DEC-TS-001 已由人工澄清答案 HT-DLV-20261116-72F2B9041E74-0014 选定 D（见 TD-017）。随该答案需要 specification 修订的条目：IQA-016 前置条件与步骤（首次设置完整流程由开发阶段自动化测试覆盖；候选环境在已有管理员时验证关闭行为）、IQA-015 与 AC-020 及测试策略（直接写明“V1 不验证升级或重新部署后的数据保留，改到后续迭代通过真实升级来验证”，不转引 QD-001）。本设计已按修订后的口径编写。
+- 无未决技术决定。DEC-TS-001 已由人工澄清答案 HT-DLV-20261116-72F2B9041E74-0014 选定 D（见 TD-017），spec 已据此修订 IQA-015、IQA-016、AC-020、AC-021 与测试策略；人工审批意见 HT-DLV-20261116-72F2B9041E74-0016 要求的初始管理员凭据交付方式由 TD-018 决定。
