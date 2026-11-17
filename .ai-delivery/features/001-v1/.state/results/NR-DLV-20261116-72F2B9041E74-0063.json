@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0063",
+  "stage": "technical-solution.gate",
+  "outcome": "passed",
+  "summary": "design.md 本轮修订（TD-011、TD-016、TD-017、TD-018，治理约束中 HT-0014/HT-0016/QD-001 行，数据库数据契约，安全与 Secret，配置，部署迁移，验证环境责任矩阵，支持 Runbook，开放决策）及 docs/dependencies.json 新增的 test 环境 secrets INITIAL_ADMIN_LOGIN_NAME/PASSWORD/DISPLAY_NAME，与修订后的 spec IQA-001、IQA-015、IQA-016、AC-020、AC-021、测试策略以及人工决定 HT-0014（DEC-TS-001=D）、HT-0016 一致：凭据通过声明的 secrets 交给 QA，应用不读取，没有流程外改库或改配置；QA 不以 SQL 写入账号；IQA-015 按 spec 不纳入 V1 验证；首次设置完整流程由开发者测试在真实 dev 实例的一次性 schema 中覆盖；ticket-db 依赖约束未改变。未发现阻塞问题。",
+  "artifacts": [],
+  "findings": []
+}
