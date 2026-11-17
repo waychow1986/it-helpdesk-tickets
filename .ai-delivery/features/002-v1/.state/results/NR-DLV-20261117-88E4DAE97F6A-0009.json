@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261117-88E4DAE97F6A-0009",
+  "stage": "specification",
+  "outcome": "passed",
+  "summary": "已基于 INT-001～INT-016 及 BQ-001～003 人工答案、人工审批意见完成 V2 产品规格 spec.md（US-001～006、FR-001～023、NFR-001、AC-001～016、IQA-001～010 与追踪矩阵），当前无阻塞产品问题。",
+  "artifacts": [
+    { "path": ".ai-delivery/features/002-v1/spec.md" }
+  ]
+}
