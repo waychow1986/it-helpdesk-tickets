@@ -728,14 +728,23 @@ async function iqa009() {
   for (const x of expUsers) {
     const u = accounts.find(v => v.login === `${K}${x.suffix}`);
     by[x.suffix] = u;
-    cp(`基线账号 ${K}${x.suffix} 的登录名、姓名、身份与升级前一致（${x.display}／${ROLE[x.role]}）`, u && u.display === x.display && u.role === x.role,
-      u ? `当前：姓名=${u.display} 身份=${ROLE[u.role] ?? u.role}（数据库 role=${u.role}）；升级前：${x.display}／${ROLE[x.role]}（V1 基线建立时经页面以该身份创建，快照沟通记录作者身份同样为「${ROLE[x.role]}」）` : '账号不存在');
+    if (x.suffix === '-emp') {
+      // 人工决定 HT-DLV-20261117-88E4DAE97F6A-0011 DEC-QA-V2-001 = B：该账号身份由维护者在 V2 升级前经 V1 账号管理修改，只核对登录名、姓名与启用状态，身份作为观察结果记录
+      cp(`基线账号 ${K}${x.suffix} 的登录名、姓名与升级前一致且为启用（${x.display}）`, u && u.display === x.display && u.active === true,
+        u ? `当前：姓名=${u.display} 启用=${u.active}；升级前：${x.display}` : '账号不存在');
+      if (u) cp(`观察：基线账号 ${K}${x.suffix} 当前身份（不作判定，DEC-QA-V2-001 B）`, true, `当前身份=${ROLE[u.role] ?? u.role}；升级前快照=${ROLE[x.role]}`);
+    } else {
+      cp(`基线账号 ${K}${x.suffix} 的登录名、姓名、身份与升级前一致且为启用（${x.display}／${ROLE[x.role]}）`, u && u.display === x.display && u.role === x.role && u.active === true,
+        u ? `当前：姓名=${u.display} 身份=${ROLE[u.role] ?? u.role} 启用=${u.active}；升级前：${x.display}／${ROLE[x.role]}` : '账号不存在');
+    }
   }
   const e = await actor('基线员工'); const t = await actor('基线IT');
   const okE = by['-emp'] ? await login(e, by['-emp']) : false;
   const okT = by['-it'] ? await login(t, by['-it']) : false;
   const navE = okE ? await navSet(e.page) : [], navT = okT ? await navSet(t.page) : [];
-  cp('基线员工用原凭据登录，获得员工能力', okE && JSON.stringify(navE) === JSON.stringify(expUsers[0].nav), `登录=${okE}；导航=${JSON.stringify(navE)}`);
+  const NAV = { EMPLOYEE: ['nav-my-tickets', 'nav-new-ticket'], IT_STAFF: ['nav-all-tickets'], ADMIN: ['nav-admin-users', 'nav-admin-categories', 'nav-report'] };
+  const empRole = by['-emp']?.role;
+  cp('基线员工账号用原凭据登录，获得与其当前身份相符的能力', okE && JSON.stringify(navE) === JSON.stringify(NAV[empRole] ?? []), `登录=${okE}；当前身份=${ROLE[empRole] ?? empRole}；导航=${JSON.stringify(navE)}`);
   cp('基线 IT 同事用原凭据登录，获得 IT 同事能力', okT && JSON.stringify(navT) === JSON.stringify(expUsers[1].nav), `登录=${okT}；导航=${JSON.stringify(navT)}`);
   const admin = await actor('V1 时期初始管理员A1', acc.A1);
   const a1Row = (await q('SELECT created_at, role, active FROM app_user WHERE id=$1', [A1.id]))[0];
@@ -751,15 +760,20 @@ async function iqa009() {
   cp('V1 全部账号（升级前创建）在账号列表中显示为「启用」', v1Users.length > 0 && bad.length === 0, `V1 账号 ${v1Users.length} 个；非启用或未显示：${JSON.stringify(bad.map(u => num(u.id)))}`);
   for (const x of expUsers) {
     const u = by[x.suffix]; const r = u && pageRows.find(v => v.id === u.id);
-    cp(`账号列表中基线账号 ${K}${x.suffix} 的姓名与身份`, r && r.display === x.display && r.role === ROLE[x.role] && r.status === '启用', `页面=${JSON.stringify(r)}`);
+    if (x.suffix === '-emp') cp(`账号列表中基线账号 ${K}${x.suffix} 的姓名与启用状态（身份显示与其当前身份一致，不与快照比较）`, r && r.display === x.display && r.role === ROLE[u.role] && r.status === '启用', `页面=${JSON.stringify(r)}；当前身份=${ROLE[u?.role]}`);
+    else cp(`账号列表中基线账号 ${K}${x.suffix} 的姓名与身份`, r && r.display === x.display && r.role === ROLE[x.role] && r.status === '启用', `页面=${JSON.stringify(r)}`);
   }
   await shot(admin.page, 'accounts');
 
   // 2）逐项核对基线类别、工单、沟通与处理记录（页面 V1 字段 vs 快照；数据库 V1 列 vs 快照摘要）
   const db = await baselineDb(snap);
   writeEvd('IQA-009-baseline-db-now.json', JSON.stringify(db, null, 2)); cur.files.push('IQA-009-baseline-db-now.json');
-  const dbNow = sha(db);
-  cp('数据库中基线 V1 列（账号、类别、工单、沟通记录、处理记录）与升级前快照摘要一致', dbNow === snap.dbDigest, `当前摘要=${dbNow}；快照摘要=${snap.dbDigest}；分项见 IQA-009-baseline-db-now.json`);
+  const empId = by['-emp']?.id;
+  // DEC-QA-V2-001 B：仅把基线员工账号的身份按快照（员工）代入后与快照摘要比较；其余列严格比较
+  const dbCmp = { ...db, users: db.users.map(j => { const r = JSON.parse(j); return num(r.id) === empId ? JSON.stringify({ ...r, role: 'EMPLOYEE' }) : j; }) };
+  const dbNow = sha(dbCmp);
+  cp('数据库中基线 V1 列（账号、类别、工单、沟通记录、处理记录；除基线员工账号身份外）与升级前快照摘要一致', dbNow === snap.dbDigest,
+    `比较摘要（基线员工账号 #${empId} 身份按快照代入）=${dbNow}；快照摘要=${snap.dbDigest}；原始摘要=${sha(db)}；分项见 IQA-009-baseline-db-now.json`);
   cp('基线类别存在且名称、有效状态不变', JSON.parse(db.category ?? 'null')?.name === `${K}-类别` && JSON.parse(db.category).active === true, db.category ?? '缺失');
   const cmp = ['| 工单 | 视角 | 与快照一致 | 不一致字段 |', '|---|---|---|---|'];
   for (const id of snap.ticketIds) {
@@ -775,15 +789,32 @@ async function iqa009() {
   }
   writeEvd('IQA-009-compare.md', ['# IQA-009 升级前快照与升级后页面逐项对比', '', ...cmp].join('\n')); cur.files.push('IQA-009-compare.md');
   if (okT) await shot(t.page, 'baseline-detail');
-  // 基线员工只见本人工单
-  if (okE && navE.includes('nav-my-tickets')) {
+  // 基线工单提交人视角的可见性（DEC-QA-V2-001 B：按该账号当前身份核对），以及 QA 员工 E1 不能访问基线工单
+  const baseAll = [...snap.ticketIds, snapId];
+  if (okE && empRole === 'EMPLOYEE') {
     const mine = await collectRows(e, '/tickets');
-    cp('基线员工「我的工单」恰为其全部工单', eqSet(mine.rows.map(r => r.id), [...snap.ticketIds, snapId]), `列表=${fmtIds(mine.rows.map(r => r.id))}`);
+    cp('基线提交人（当前身份：员工）「我的工单」恰为其全部工单', eqSet(mine.rows.map(r => r.id), baseAll), `列表=${fmtIds(mine.rows.map(r => r.id))}`);
     const st = await go(e.page, `/tickets/${ids.otherTicket}`);
-    cp('基线员工访问他人工单被拒绝', st === 403 && (await e.page.getByTestId('detail-title').count()) === 0, `GET /tickets/${ids.otherTicket} -> ${st}`);
+    cp('基线提交人（员工）访问他人工单被拒绝', st === 403 && (await e.page.getByTestId('detail-title').count()) === 0, `GET /tickets/${ids.otherTicket} -> ${st}`);
     await shot(e.page, 'employee-other-ticket');
+  } else if (okE && empRole === 'IT_STAFF') {
+    const list = await collectRows(e, `/tickets?q=${encodeURIComponent(K)}`);
+    const seen = list.rows.map(r => r.id);
+    const miss = baseAll.filter(id => !seen.includes(id));
+    cp('基线提交人（当前身份：IT 同事）在全部工单中能看到并打开其提交的全部基线工单', miss.length === 0, `列表=${fmtIds(seen)}；缺失=${fmtIds(miss)}`);
+    await shot(e.page, 'baseline-submitter-list');
   } else {
-    cp('基线员工「我的工单」与越权访问', false, `基线员工未获得员工能力（导航=${JSON.stringify(navE)}），无法按员工权限查看「我的工单」`);
+    cp('基线提交人视角的基线工单可见性', false, `基线员工账号登录=${okE}，当前身份=${ROLE[empRole] ?? empRole}，无法按其当前身份核对可见性`);
+  }
+  {
+    const e1 = await actor('QA 员工E1', acc.E1);
+    const sts = [];
+    for (const id of baseAll) sts.push([id, await go(e1.page, `/tickets/${id}`), await e1.page.getByTestId('detail-title').count()]);
+    const mine = await collectRows(e1, '/tickets');
+    const leak = mine.rows.map(r => r.id).filter(id => baseAll.includes(id));
+    cp('QA 创建的员工 E1 不能访问基线工单（详情 403，「我的工单」中不出现）', sts.every(([, st, n]) => st === 403 && n === 0) && leak.length === 0,
+      `${sts.map(([id, st]) => `GET /tickets/${id} -> ${st}`).join('；')}；我的工单中的基线工单=${fmtIds(leak)}`);
+    await shot(e1.page, 'e1-baseline-denied');
   }
 
   // 3）期望解决时间与超时标识（全部基线工单，含快照工单）

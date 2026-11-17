@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261117-88E4DAE97F6A-0035",
+  "stage": "qa.plan",
+  "outcome": "passed",
+  "summary": "已按人工决定 DEC-QA-V2-001（B）修订 IQA-009 的计划与脚本（基线员工账号只核对登录名、姓名、登录与启用状态，身份作为观察记录，数据库摘要除该账号身份外与快照比较，并以 QA 员工核对不能访问基线工单），对已部署候选两阶段试运行全部 10 个场景均能如实判定且通过，计划可锁定。",
+  "artifacts": [
+    { "path": ".ai-delivery/features/002-v1/tasks-qa.md" },
+    { "path": ".ai-delivery/features/002-v1/runtime/qa-run.sh" }
+  ]
+}
