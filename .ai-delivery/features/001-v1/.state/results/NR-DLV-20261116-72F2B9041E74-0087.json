@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0087",
+  "stage": "qa.plan",
+  "outcome": "needs_decision",
+  "summary": "已按上游变化修订 QA 计划，新增 IQA-016，改为只用业务方提供的初始管理员、经页面创建账号；但 test 环境注入的一次性设置口令不满足应用要求（不少于 16 个字符），候选设置页显示“此部署未提供设置口令”，无法完成 IQA-016 情形①的首次设置，其余场景也因此无法执行，需要人工处理。修订条目：tasks-qa.md 的范围与依据、执行前置 1 与 5～8、判定口径、IQA-001、IQA-008、IQA-015 的依据与基线账号来源、新增 IQA-016、覆盖自检；qa-run.sh 新增 IQA-016 情形①/②、机密遮挡、经页面创建账号、数据库端口改读环境变量、预期场景数改为 15。试运行：在本地以候选源码 81bbea0 连接 test 库中的一次性 schema（合成机密）连跑两次，情形①、情形②与 IQA-001～IQA-014 共 15 个场景全部判定完成，证据中没有机密明文，一次性 schema 已删除；对已部署候选试运行时，脚本在提交任何设置请求前就识别到口令不可用，按执行环境问题处理，test 库没有变化。",
+  "artifacts": [
+    { "path": ".ai-delivery/features/001-v1/tasks-qa.md" },
+    { "path": ".ai-delivery/features/001-v1/runtime/qa-run.sh" }
+  ],
+  "decisionsNeeded": [
+    {
+      "id": "QA-DEC-001",
+      "level": "technical",
+      "question": "test 环境注入的一次性设置口令 INITIAL_SETUP_TOKEN 去掉首尾空白后不足 16 个字符。已批准设计 TD-019 规定这种口令视为“未配置”，docs/dependencies.json 中该机密的说明也写明应用要求不少于 16 个字符。因此已部署候选 81bbea0 的 /setup 页显示“此部署未提供设置口令，暂不能完成设置”。test 库目前没有带凭据的管理员（情形①），IQA-016 无法完成首次设置。按人工审批意见 HT-DLV-20261116-72F2B9041E74-0016，QA 不自备管理员，所以 IQA-001～IQA-014 也无法执行。观察证据：QA 身份只读查询结果为 role=ADMIN 且 password_hash 不为空的账号数为 0；GET /setup 返回的页面含 setup-token-missing；只在本地比较了注入值的长度，没有输出该值。如何处理？",
+      "affects": ["IQA-016", "FR-031", "AC-021", "SC-007", "TD-019", "IQA-001", "IQA-014"],
+      "options": [
+        {
+          "key": "A",
+          "label": "由人在平台依赖与机密任务中把 test 环境的 INITIAL_SETUP_TOKEN 更正为不少于 16 个字符的值，平台重新部署候选后，再执行已锁定的 QA 计划",
+          "recommended": true,
+          "rationale": "符合已批准的 TD-019 与机密声明，不需要改产品或计划；本地以合成口令验证过，此时 IQA-016 情形①和其余 14 个场景都能完成。"
+        },
+        {
+          "key": "B",
+          "label": "放宽应用对设置口令长度的要求，回到技术方案修订 TD-019，再重新实现与验证",
+          "recommended": false,
+          "rationale": "会改动已批准的安全设计，削弱口令防抢占的强度，还要重走技术方案、编码与候选验证。"
+        },
+        {
+          "key": "C",
+          "label": "保持现状，直接执行 QA；本候选上的 qa-run 会以执行环境问题结束，所有场景都不会得到验收结论",
+          "recommended": false,
+          "rationale": "无法产生任何验收证据，只能推迟问题。"
+        }
+      ]
+    }
+  ]
+}
