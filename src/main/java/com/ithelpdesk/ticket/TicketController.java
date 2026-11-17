@@ -4,6 +4,8 @@ import com.ithelpdesk.auth.CurrentUser;
 import com.ithelpdesk.category.CategoryService;
 import com.ithelpdesk.config.AppProperties;
 import com.ithelpdesk.web.ValidationException;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Map;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.stereotype.Controller;
@@ -16,7 +18,10 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.springframework.web.util.UriComponentsBuilder;
 
-/** 工单页面：列表 / 搜索 / 筛选、提交、详情、补充说明 / 回复、认领、分派、改状态。 */
+/**
+ * 工单页面：列表 / 搜索 / 筛选、提交、详情、补充说明 / 回复、认领、分派、改状态。
+ * V2：每个页面请求开始时取一次 clock.instant() 作为本页 now，超时标识只调用 Overdue 判定（TD-021）。
+ */
 @Controller
 public class TicketController {
 
@@ -24,13 +29,15 @@ public class TicketController {
     private final TicketCommandService commands;
     private final CategoryService categories;
     private final AppProperties properties;
+    private final Clock clock;
 
     public TicketController(TicketQueryService queries, TicketCommandService commands, CategoryService categories,
-                            AppProperties properties) {
+                            AppProperties properties, Clock clock) {
         this.queries = queries;
         this.commands = commands;
         this.categories = categories;
         this.properties = properties;
+        this.clock = clock;
     }
 
     @GetMapping("/tickets")
@@ -43,9 +50,10 @@ public class TicketController {
                        @RequestParam(name = "to", required = false) String to,
                        @RequestParam(name = "page", required = false) String page,
                        Model model) {
+        Instant now = clock.instant();
         TicketSearchCriteria criteria = TicketSearchCriteria.parse(q, status, categoryId, assignee, from, to, page,
             properties.zoneId());
-        TicketPage result = queries.search(actor, criteria);
+        TicketPage result = queries.search(actor, criteria).withOverdue(now);
         model.addAttribute("criteria", criteria);
         model.addAttribute("result", result);
         model.addAttribute("pageTitle", actor.isEmployee() ? "我的工单" : "全部工单");
@@ -133,7 +141,8 @@ public class TicketController {
     }
 
     private String renderDetail(CurrentUser actor, long id, Model model) {
-        TicketDetail detail = queries.detail(actor, id);
+        Instant now = clock.instant();
+        TicketDetail detail = queries.detail(actor, id).withOverdue(now);
         model.addAttribute("detail", detail);
         model.addAttribute("ticket", detail.ticket());
         model.addAttribute("statuses", TicketStatus.values());

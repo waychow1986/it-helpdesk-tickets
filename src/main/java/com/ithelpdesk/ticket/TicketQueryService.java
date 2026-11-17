@@ -50,15 +50,16 @@ public class TicketQueryService {
         return new TicketDetail(ticket, comments.findByTicket(ticketId), events.findByTicket(ticketId));
     }
 
-    /** 分派对象：当前 IT 同事中除本人以外的账号（FR-016）。 */
+    /** 分派对象：启用状态的 IT 同事中除本人以外的账号（V1 FR-016；V2 FR-011、TD-026）。 */
     @Transactional(readOnly = true)
     public List<AppUser> assignableStaff(CurrentUser actor) {
         if (actor == null || !actor.isItStaff()) {
             return List.of();
         }
-        return users.findCurrentItStaff().stream().filter(u -> u.id() != actor.getId()).toList();
+        return users.findAssignableItStaff().stream().filter(u -> u.id() != actor.getId()).toList();
     }
 
+    /** 筛选“处理人”选项：IT 同事 ∪ 曾任处理人，不按启用状态过滤（FR-013、TD-026）。 */
     @Transactional(readOnly = true)
     public List<TicketRepository.UserOption> assigneeOptions(CurrentUser actor) {
         visibilityScope(actor);

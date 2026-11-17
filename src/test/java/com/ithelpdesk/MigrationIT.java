@@ -14,7 +14,10 @@ import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 
-/** 迁移在真实 dev 实例上可重复执行、结构与约束生效（TD-004、FR-030、NFR-001、INV-006、INV-007）。 */
+/**
+ * 迁移在真实 dev 实例上可重复执行、结构与约束生效（V1 TD-004、FR-030、NFR-001、INV-006、INV-007；
+ * V2 TD-022、TD-029、FR-021、FR-023、AC-015：当前版本为 2，app_user.active 为 BOOLEAN NOT NULL DEFAULT TRUE）。
+ */
 class MigrationIT extends IntegrationTestBase {
 
     @Autowired
@@ -26,10 +29,51 @@ class MigrationIT extends IntegrationTestBase {
         MigrateResult again = flyway.migrate();
         assertThat(again.migrationsExecuted).isZero();
         assertThat(flyway.info().pending()).isEmpty();
-        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("1");
+        assertThat(flyway.info().current().getVersion().getVersion()).isEqualTo("2");
         String name = jdbc.queryForObject("SELECT name FROM category WHERE id = :id",
             new MapSqlParameterSource("id", categoryId), String.class);
         assertThat(name).isEqualTo(data.name("迁移保留"));
+    }
+
+    @Test
+    void versionsOneAndTwoAppliedSuccessfullyOnce() {
+        List<Map<String, Object>> rows = jdbc.queryForList("SELECT version, success FROM flyway_schema_history "
+            + "WHERE version IN ('1','2') ORDER BY installed_rank", Map.of());
+        assertThat(rows).extracting(r -> r.get("version")).containsExactly("1", "2");
+        assertThat(rows).allSatisfy(r -> assertThat(r.get("success")).isEqualTo(Boolean.TRUE));
+        Long failed = jdbc.queryForObject("SELECT COUNT(*) FROM flyway_schema_history WHERE NOT success", Map.of(),
+            Long.class);
+        assertThat(failed).isZero();
+    }
+
+    @Test
+    void activeColumnIsBooleanNotNullDefaultTrue() {
+        Map<String, Object> column = jdbc.queryForMap("SELECT data_type, is_nullable, column_default "
+            + "FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = 'app_user' "
+            + "AND column_name = 'active'", Map.of());
+        assertThat(column.get("data_type")).isEqualTo("boolean");
+        assertThat(column.get("is_nullable")).isEqualTo("NO");
+        assertThat(column.get("column_default")).isEqualTo("true");
+        long id = data.user("默认启用", com.ithelpdesk.user.Role.EMPLOYEE).getId();
+        assertThat(jdbc.queryForObject("SELECT active FROM app_user WHERE id = :id",
+            new MapSqlParameterSource("id", id), Boolean.class)).isTrue();
+    }
+
+    @Test
+    void v1TablesKeepTheirColumns() {
+        Map<String, List<String>> expected = Map.of(
+            "app_user", List.of("id", "login_name", "password_hash", "display_name", "role", "created_at",
+                "created_by", "active"),
+            "category", List.of("id", "name", "active", "created_at", "removed_at"),
+            "ticket", List.of("id", "title", "description", "category_id", "urgency", "submitter_id", "submitted_at",
+                "status", "assignee_id", "first_resolved_at", "first_resolved_assignee_id", "updated_at"),
+            "ticket_comment", List.of("id", "ticket_id", "author_id", "author_role", "body", "created_at"),
+            "ticket_event", List.of("id", "ticket_id", "actor_id", "event_type", "from_assignee_id", "to_assignee_id",
+                "from_status", "to_status", "created_at"));
+        expected.forEach((table, columns) -> assertThat(jdbc.queryForList("SELECT column_name FROM "
+                + "information_schema.columns WHERE table_schema = current_schema() AND table_name = :t "
+                + "ORDER BY ordinal_position", new MapSqlParameterSource("t", table), String.class))
+            .as(table).containsExactlyElementsOf(columns));
     }
 
     @Test

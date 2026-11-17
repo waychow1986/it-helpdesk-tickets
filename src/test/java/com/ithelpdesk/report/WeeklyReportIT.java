@@ -14,6 +14,7 @@ import java.sql.Timestamp;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneId;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -22,7 +23,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 
 /**
- * 周报表四项口径（FR-026～FR-028、PQ-002 A、TD-008、TD-010、IQA-013、IQA-014）。
+ * 周报表四项口径（V1 FR-026～FR-028、PQ-002 A、TD-008、TD-010、IQA-013、IQA-014）与 V2 第五项
+ * “本周超时解决的工单数量”（TD-028、FR-017、FR-018、FR-022、AC-011、AC-012、BQ-002 人工答案 A）。
  * 测试时钟设到 1970～2000 年间随机一周，使本周统计只包含本测试数据。
  */
 class WeeklyReportIT extends IntegrationTestBase {
@@ -43,8 +45,12 @@ class WeeklyReportIT extends IntegrationTestBase {
     private UserAdminService userAdmin;
 
     private long submit(CurrentUser who, long cat, Instant at) {
+        return submit(who, cat, at, "LOW");
+    }
+
+    private long submit(CurrentUser who, long cat, Instant at, String urgency) {
         clock.set(at);
-        return commands.submit(who, new TicketForm("报表合成", "d", String.valueOf(cat), "LOW"));
+        return commands.submit(who, new TicketForm("报表合成", "d", String.valueOf(cat), urgency));
     }
 
     private void status(CurrentUser staff, long id, String status, Instant at) {
@@ -142,6 +148,56 @@ class WeeklyReportIT extends IntegrationTestBase {
         assertThat(report.unassignedResolved()).isZero();
         assertThat(report.averageSeconds()).isNull();
         assertThat(report.averageDisplay()).isEqualTo("无数据");
+        assertThat(report.overdueResolved()).isZero();
+    }
+
+    @Test
+    void fifthMetricCountsFirstResolvedThisWeekStrictlyAfterExpected() {
+        Instant now = RunPrefix.randomHistoricalWednesdayNoon(SH);
+        WeekRange week = WeekRange.containing(now, SH);
+        Instant mon = week.start();
+        Instant lastMon = mon.minus(Duration.ofDays(7));
+        CurrentUser admin = data.user("admin5", Role.ADMIN);
+        CurrentUser emp = data.user("emp5", Role.EMPLOYEE);
+        CurrentUser st = data.user("st5", Role.IT_STAFF);
+        long cat = data.category("超时解决");
+
+        // 恰好等于期望解决时间：不计入
+        long exact = submit(emp, cat, mon.plus(Duration.ofHours(1)), "HIGH");
+        status(st, exact, "RESOLVED", mon.plus(Duration.ofHours(5)));
+        // 本周首次解决且晚于期望：计入
+        long late = submit(emp, cat, mon.plus(Duration.ofHours(1)), "HIGH");
+        status(st, late, "RESOLVED", mon.plus(Duration.ofHours(5)).plusSeconds(1));
+        // 早于期望：不计入
+        long early = submit(emp, cat, mon.plus(Duration.ofHours(2)), "MEDIUM");
+        status(st, early, "RESOLVED", mon.plus(Duration.ofHours(20)));
+        // 上周首次解决（已超时），本周改回后再次解决：不计入
+        long again = submit(emp, cat, lastMon.plus(Duration.ofHours(1)), "LOW");
+        status(st, again, "RESOLVED", lastMon.plus(Duration.ofHours(80)));
+        status(st, again, "IN_PROGRESS", mon.plus(Duration.ofHours(3)));
+        status(st, again, "RESOLVED", mon.plus(Duration.ofHours(4)));
+        // 只关闭、从未解决：不计入
+        long closed = submit(emp, cat, mon.plus(Duration.ofHours(1)), "HIGH");
+        status(st, closed, "CLOSED", mon.plus(Duration.ofHours(10)));
+        // 首次解决（已超时）后改回待处理：仍计入
+        long reopened = submit(emp, cat, mon.plus(Duration.ofHours(1)), "HIGH");
+        status(st, reopened, "RESOLVED", mon.plus(Duration.ofHours(6)));
+        status(st, reopened, "OPEN", mon.plus(Duration.ofHours(7)));
+        // 上周提交、本周首次解决且晚于期望：计入
+        long carried = submit(emp, cat, lastMon.plus(Duration.ofHours(1)), "LOW");
+        status(st, carried, "RESOLVED", mon.plus(Duration.ofHours(10)));
+
+        clock.set(now);
+        WeeklyReport report = reports.currentWeek(admin);
+        assertThat(report.overdueResolved()).isEqualTo(3);
+        // 独立 SQL（时长常量在测试中独立写出）
+        long independent = data.count("SELECT COUNT(*) FROM ticket WHERE first_resolved_at >= :s "
+            + "AND first_resolved_at < :e AND first_resolved_at > submitted_at + CASE urgency WHEN 'HIGH' THEN "
+            + "INTERVAL '4 hours' WHEN 'MEDIUM' THEN INTERVAL '1 day' ELSE INTERVAL '3 days' END",
+            new MapSqlParameterSource().addValue("s", Timestamp.from(week.start()))
+                .addValue("e", Timestamp.from(week.endExclusive())));
+        assertThat(report.overdueResolved()).isEqualTo(independent);
+        assertThat(List.of(exact, late, early, again, closed, reopened, carried)).doesNotHaveDuplicates();
     }
 
     @Test

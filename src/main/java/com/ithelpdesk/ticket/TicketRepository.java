@@ -32,7 +32,8 @@ public class TicketRepository {
     private static final String SELECT = "SELECT t.id, t.title, t.description, t.category_id, c.name AS category_name, "
         + "c.active AS category_active, t.urgency, t.submitter_id, s.display_name AS submitter_name, t.submitted_at, "
         + "t.status, t.assignee_id, a.display_name AS assignee_name, t.first_resolved_at, "
-        + "t.first_resolved_assignee_id, t.updated_at "
+        + "t.first_resolved_assignee_id, t.updated_at, " + ExpectedResolution.sql("t") + " AS "
+        + ExpectedResolution.COLUMN_ALIAS + " "
         + "FROM ticket t JOIN category c ON c.id = t.category_id JOIN app_user s ON s.id = t.submitter_id "
         + "LEFT JOIN app_user a ON a.id = t.assignee_id ";
 
@@ -50,7 +51,8 @@ public class TicketRepository {
             Urgency.valueOf(rs.getString("urgency")), rs.getLong("submitter_id"), rs.getString("submitter_name"),
             instant(rs, "submitted_at"), TicketStatus.valueOf(rs.getString("status")),
             nullableLong(rs, "assignee_id"), rs.getString("assignee_name"), instant(rs, "first_resolved_at"),
-            nullableLong(rs, "first_resolved_assignee_id"), instant(rs, "updated_at"));
+            nullableLong(rs, "first_resolved_assignee_id"), instant(rs, "updated_at"),
+            instant(rs, ExpectedResolution.COLUMN_ALIAS));
     }
 
     static Instant instant(ResultSet rs, String column) throws SQLException {

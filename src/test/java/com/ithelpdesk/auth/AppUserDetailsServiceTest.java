@@ -68,4 +68,33 @@ class AppUserDetailsServiceTest {
             UsernamePasswordAuthenticationToken.unauthenticated("admin", "anything")))
             .isInstanceOf(DisabledException.class);
     }
+
+    @Test
+    void deactivatedAccountIsDisabledAndFailsLikeBadCredentialsPage() {
+        BCryptPasswordEncoder encoder = new BCryptPasswordEncoder(4);
+        String hash = encoder.encode("right");
+        when(users.findByLoginName("off")).thenReturn(Optional.of(
+            new AppUser(3, "off", hash, "停用员工", Role.EMPLOYEE, Instant.EPOCH, 1L, false)));
+        UserDetails details = service.loadUserByUsername("off");
+        assertThat(details.isEnabled()).isFalse();
+        assertThat(((CurrentUser) details).getRole()).isEqualTo(Role.EMPLOYEE);
+        DaoAuthenticationProvider provider = new DaoAuthenticationProvider(service);
+        provider.setPasswordEncoder(encoder);
+        // 正确与错误凭据都被拒绝（均为 AuthenticationException → 同一 /login?error 页面，TD-023）
+        assertThatThrownBy(() -> provider.authenticate(
+            UsernamePasswordAuthenticationToken.unauthenticated("off", "right")))
+            .isInstanceOf(AuthenticationException.class);
+        assertThatThrownBy(() -> provider.authenticate(
+            UsernamePasswordAuthenticationToken.unauthenticated("off", "wrong")))
+            .isInstanceOf(AuthenticationException.class);
+    }
+
+    @Test
+    void currentUserEnabledRequiresHashAndActive() {
+        assertThat(new CurrentUser(1, "a", "a", Role.EMPLOYEE, "h", true).isEnabled()).isTrue();
+        assertThat(new CurrentUser(1, "a", "a", Role.EMPLOYEE, "h", false).isEnabled()).isFalse();
+        assertThat(new CurrentUser(1, "a", "a", Role.ADMIN, null, true).isEnabled()).isFalse();
+        assertThat(CurrentUser.of(new AppUser(1, "a", "h", "a", Role.ADMIN, Instant.EPOCH, null, false)).isEnabled())
+            .isFalse();
+    }
 }

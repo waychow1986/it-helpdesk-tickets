@@ -34,3 +34,5 @@ button { cursor: pointer; }
 .meta { color: #52606d; font-size: .9rem; }
 .actions { background: #fff; border: 1px solid #d9dee5; padding: .75rem 1rem; }
 .pager { margin-top: 1rem; display: flex; gap: 1rem; }
+/* V2 超时未解决标识（FR-005、TD-021）：红底白字粗体标签，与未超时工单明确区分 */
+.overdue { display: inline-block; margin-left: .35rem; padding: 0 .4rem; border-radius: 3px; background: #c81e1e; color: #fff; font-weight: 700; font-size: .85rem; }

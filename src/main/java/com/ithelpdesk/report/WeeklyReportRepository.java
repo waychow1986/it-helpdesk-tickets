@@ -1,5 +1,6 @@
 package com.ithelpdesk.report;
 
+import com.ithelpdesk.ticket.ExpectedResolution;
 import java.math.BigDecimal;
 import java.sql.Timestamp;
 import java.time.Instant;
@@ -65,6 +66,17 @@ public class WeeklyReportRepository {
         Long count = jdbc.queryForObject("SELECT COUNT(*) FROM ticket WHERE status IN ('OPEN','IN_PROGRESS') "
                 + "AND submitted_at < :threshold",
             new MapSqlParameterSource("threshold", Timestamp.from(threshold)), Long.class);
+        return count == null ? 0 : count;
+    }
+
+    /**
+     * 本周超时解决：首次已解决时刻在本周内且严格晚于期望解决时间的工单数（FR-017、BQ-002 人工答案 A、TD-028）。
+     * 再次解决、只关闭从未解决、恰好等于期望解决时间均不计入；首次解决后状态再变不影响计入。
+     */
+    public long overdueResolvedCount(WeekRange week) {
+        Long count = jdbc.queryForObject("SELECT COUNT(*) FROM ticket t WHERE t.first_resolved_at >= :start "
+                + "AND t.first_resolved_at < :end AND t.first_resolved_at > " + ExpectedResolution.sql("t"),
+            range(week), Long.class);
         return count == null ? 0 : count;
     }
 }

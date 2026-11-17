@@ -103,9 +103,63 @@ export async function insertTicket(t: TicketSeed): Promise<number> {
   return id;
 }
 
-/** 按"数据库数据契约"顺序清理本次运行前缀的数据。 */
+/** V1 持久升级基线前缀（TD-034）：任何测试都不得修改或清理该前缀的数据。 */
+export const V1_BASELINE_PREFIX = 'q15-72f2b9041e74-';
+
+/** 清理前缀必须是本次运行前缀，且不得与 V1 持久升级基线前缀相互匹配。 */
+export function assertSafePrefix(prefix: string): string {
+  if (!/^e2e-\d+-[0-9a-f]+-$/.test(prefix ?? '')) {
+    throw new Error('清理前缀不合法（只接受 e2e-<时间>-<随机>- 形式的运行前缀）');
+  }
+  if (prefix.startsWith(V1_BASELINE_PREFIX) || V1_BASELINE_PREFIX.startsWith(prefix)) {
+    throw new Error('清理前缀与 V1 持久升级基线前缀冲突');
+  }
+  return prefix;
+}
+
+export type Urgency = 'LOW' | 'MEDIUM' | 'HIGH';
+
+/** 期望解决时长（小时），测试独立定义：高 4、中 24、低 72（BQ-001 人工答案 A）。 */
+export const RESOLUTION_HOURS: Record<Urgency, number> = { HIGH: 4, MEDIUM: 24, LOW: 72 };
+
+/** 独立计算期望解决时间 = 提交时间 + 4/24/72 小时（自然时间）。 */
+export function expectedResolveAt(submittedAt: Date, urgency: Urgency): Date {
+  return new Date(submittedAt.getTime() + RESOLUTION_HOURS[urgency] * 3600 * 1000);
+}
+
+/** 读取工单的提交时间与紧急程度（数据库原值）。 */
+export async function ticketBasics(id: number): Promise<{ submittedAt: Date; urgency: Urgency; status: Status }> {
+  const rows = await query<{ submitted_at: Date; urgency: Urgency; status: Status }>(
+    'SELECT submitted_at, urgency, status FROM ticket WHERE id = $1', [id]);
+  if (rows.length !== 1) throw new Error(`工单 ${id} 不存在`);
+  return { submittedAt: rows[0].submitted_at, urgency: rows[0].urgency, status: rows[0].status };
+}
+
+/** 追加一条状态处理记录（与应用写入语义一致：再次解决不改首次已解决时刻）。 */
+export async function appendStatusEvent(ticketId: number, actorId: number, from: Status, to: Status, at: Date):
+  Promise<void> {
+  await query(`INSERT INTO ticket_event(ticket_id, actor_id, event_type, from_status, to_status, created_at)
+    VALUES ($1, $2, 'STATUS', $3, $4, $5)`, [ticketId, actorId, from, to, at]);
+}
+
+/**
+ * 按 FR-017 口径独立计算“本周超时解决的工单数量”：首次已解决时刻在 [weekStart, weekStart+7d) 内且严格晚于
+ * 提交时间 + 4/24/72 小时（时长在此独立写出，不复用应用 SQL）。可选 ids 时只统计这些工单并返回计入的 id。
+ */
+export async function overdueResolvedIds(weekStart: Date, ids?: number[]): Promise<number[]> {
+  const weekEnd = new Date(weekStart.getTime() + 7 * 86400 * 1000);
+  const rows = await query<{ id: string }>(
+    `SELECT id FROM ticket WHERE first_resolved_at >= $1 AND first_resolved_at < $2
+       AND first_resolved_at > submitted_at + CASE urgency WHEN 'HIGH' THEN interval '4 hours'
+         WHEN 'MEDIUM' THEN interval '1 day' ELSE interval '3 days' END
+       AND ($3::bigint[] IS NULL OR id = ANY($3::bigint[])) ORDER BY id`,
+    [weekStart, weekEnd, ids ?? null]);
+  return rows.map(r => Number(r.id));
+}
+
+/** 按"数据库数据契约"顺序清理本次运行前缀的数据（不匹配 V1 持久升级基线前缀）。 */
 export async function cleanup(prefix: string): Promise<void> {
-  const p = `${prefix}%`;
+  const p = `${assertSafePrefix(prefix)}%`;
   const users = '(SELECT id FROM app_user WHERE login_name LIKE $1)';
   const categories = '(SELECT id FROM category WHERE name LIKE $1)';
   const tickets = `(SELECT id FROM ticket WHERE submitter_id IN ${users} OR category_id IN ${categories}

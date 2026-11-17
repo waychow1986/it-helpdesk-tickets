@@ -14,6 +14,8 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +25,11 @@ import org.springframework.transaction.annotation.Transactional;
  */
 @Service
 public class TicketCommandService {
+
+    public static final String MSG_ASSIGNEE_NOT_STAFF = "分派对象必须是其他 IT 同事";
+    public static final String MSG_ASSIGNEE_INACTIVE = "该 IT 同事已停用，不能分派，请刷新后重新选择";
+
+    private static final Logger LOG = LoggerFactory.getLogger(TicketCommandService.class);
 
     private final TicketRepository tickets;
     private final TicketCommentRepository comments;
@@ -91,7 +98,10 @@ public class TicketCommandService {
         return "已认领该工单";
     }
 
-    /** 分派给另一位当前 IT 同事（FR-016、INV-002）。返回提示文本。 */
+    /**
+     * 分派给另一位启用状态的 IT 同事（V1 FR-016、INV-002；V2 FR-011、TD-026）。返回提示文本。
+     * 工单行锁之后以 FOR SHARE 读取目标身份与启用状态，与停用的 UPDATE 互斥，按提交顺序生效。
+     */
     @Transactional
     public String assign(CurrentUser actor, long ticketId, String assigneeIdValue) {
         requireItStaff(actor);
@@ -100,8 +110,14 @@ public class TicketCommandService {
             throw new ValidationException("assigneeId", "请选择分派对象");
         }
         TicketRepository.TicketState state = tickets.lockForUpdate(ticketId).orElseThrow(NotFoundException::new);
-        if (targetId == actor.getId() || users.findRoleForShare(targetId).orElse(null) != Role.IT_STAFF) {
-            throw new ValidationException("assigneeId", "分派对象必须是其他 IT 同事");
+        Optional<UserRepository.AssigneeCandidate> target = targetId == actor.getId() ? Optional.empty()
+            : users.findAssigneeCandidateForShare(targetId);
+        if (target.isEmpty() || target.get().role() != Role.IT_STAFF) {
+            throw new ValidationException("assigneeId", MSG_ASSIGNEE_NOT_STAFF);
+        }
+        if (!target.get().active()) {
+            LOG.info("分派被拒绝：目标账号已停用（工单 id={}，目标 id={}）", ticketId, targetId);
+            throw new ValidationException("assigneeId", MSG_ASSIGNEE_INACTIVE);
         }
         if (Objects.equals(state.assigneeId(), targetId)) {
             return "处理人未变化";

@@ -18,8 +18,9 @@ import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 /**
- * 每个已认证请求按用户 id 读库刷新身份（TD-006，FR-004"下一次操作即生效"）。
- * 账号不存在时使会话失效并重定向登录。由 SecurityConfig 放在 AuthorizationFilter 之前。
+ * 每个已认证请求按用户 id 读库刷新身份（TD-006，V1 FR-004"下一次操作即生效"）。
+ * 账号不存在或已停用（V2 FR-009、TD-024）时清空上下文、使会话失效并重定向登录，该请求不进入后续处理。
+ * 由 SecurityConfig 放在 AuthorizationFilter 之前。
  */
 public class RoleRefreshFilter extends OncePerRequestFilter {
 
@@ -41,7 +42,7 @@ public class RoleRefreshFilter extends OncePerRequestFilter {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.isAuthenticated() && auth.getPrincipal() instanceof CurrentUser current) {
             Optional<AppUser> stored = users.findById(current.getId());
-            if (stored.isEmpty()) {
+            if (stored.isEmpty() || !stored.get().active()) {
                 SecurityContextHolder.clearContext();
                 HttpSession session = request.getSession(false);
                 if (session != null) {

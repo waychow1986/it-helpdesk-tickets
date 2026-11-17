@@ -39,18 +39,20 @@
   <p th:if="${result.empty}" data-testid="ticket-empty" class="empty">无匹配工单</p>
   <table th:unless="${result.empty}" class="grid">
     <thead>
-    <tr><th>编号</th><th>标题</th><th>类别</th><th>紧急程度</th><th>状态</th><th>处理人</th><th>提交人</th><th>提交时间</th></tr>
+    <tr><th>编号</th><th>标题</th><th>类别</th><th>紧急程度</th><th>状态</th><th>处理人</th><th>提交人</th><th>提交时间</th><th>期望解决时间</th></tr>
     </thead>
     <tbody>
-    <tr th:each="t : ${result.items}" data-testid="ticket-row" th:attr="data-ticket-id=${t.id}">
+    <tr th:each="t : ${result.items}" data-testid="ticket-row" th:attr="data-ticket-id=${t.id},data-overdue=${result.overdue(t)}">
       <td><a th:href="@{/tickets/{id}(id=${t.id})}" th:text="'#' + ${t.id}" data-testid="ticket-link">#1</a></td>
       <td data-testid="row-title" th:text="${t.title}">标题</td>
       <td data-testid="row-category" th:text="${t.categoryLabel()}">类别</td>
       <td data-testid="row-urgency" th:text="${t.urgency.label}">中</td>
-      <td data-testid="row-status" th:text="${t.status.label}">待处理</td>
+      <td><span data-testid="row-status" th:text="${t.status.label}">待处理</span>
+        <span th:if="${result.overdue(t)}" class="overdue" data-testid="row-overdue">已超时</span></td>
       <td data-testid="row-assignee" th:text="${t.assigneeLabel()}">未分配</td>
       <td data-testid="row-submitter" th:text="${t.submitterName}">提交人</td>
       <td data-testid="row-submitted" th:text="${@timeFormat.format(t.submittedAt)}">时间</td>
+      <td data-testid="row-expected" th:attr="data-expected-at=${t.expectedResolveAtIso()}" th:text="${@timeFormat.format(t.expectedResolveAt)}">时间</td>
     </tr>
     </tbody>
   </table>

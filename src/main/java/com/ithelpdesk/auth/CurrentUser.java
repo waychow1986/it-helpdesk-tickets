@@ -9,7 +9,10 @@ import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-/** 已登录用户（会话 principal）：id / 登录名 / 姓名 / 身份；认证完成后擦除密码哈希。 */
+/**
+ * 已登录用户（会话 principal）：id / 登录名 / 姓名 / 身份；认证完成后擦除密码哈希。
+ * isEnabled = 已设置凭据且账号处于启用状态（TD-011、TD-023）。
+ */
 public final class CurrentUser implements UserDetails, CredentialsContainer {
 
     private static final long serialVersionUID = 1L;
@@ -22,12 +25,17 @@ public final class CurrentUser implements UserDetails, CredentialsContainer {
     private String passwordHash;
 
     public CurrentUser(long id, String loginName, String displayName, Role role, String passwordHash) {
+        this(id, loginName, displayName, role, passwordHash, true);
+    }
+
+    public CurrentUser(long id, String loginName, String displayName, Role role, String passwordHash,
+                       boolean active) {
         this.id = id;
         this.loginName = loginName;
         this.displayName = displayName;
         this.role = role;
         this.passwordHash = passwordHash;
-        this.enabled = passwordHash != null;
+        this.enabled = passwordHash != null && active;
     }
 
     private CurrentUser(long id, String loginName, String displayName, Role role) {
@@ -40,10 +48,11 @@ public final class CurrentUser implements UserDetails, CredentialsContainer {
     }
 
     public static CurrentUser of(AppUser user) {
-        return new CurrentUser(user.id(), user.loginName(), user.displayName(), user.role(), user.passwordHash());
+        return new CurrentUser(user.id(), user.loginName(), user.displayName(), user.role(), user.passwordHash(),
+            user.active());
     }
 
-    /** 以新身份重建（RoleRefreshFilter 使用），不携带凭据。 */
+    /** 以新身份重建（RoleRefreshFilter 使用，仅针对启用账号），不携带凭据。 */
     public CurrentUser withRole(Role newRole) {
         return new CurrentUser(id, loginName, displayName, newRole);
     }
@@ -95,7 +104,7 @@ public final class CurrentUser implements UserDetails, CredentialsContainer {
         return loginName;
     }
 
-    /** password_hash 为 NULL 的引导账号视为禁用（TD-011）。 */
+    /** password_hash 为 NULL 的引导账号与已停用账号视为禁用（TD-011、TD-023）。 */
     @Override
     public boolean isEnabled() {
         return enabled;
