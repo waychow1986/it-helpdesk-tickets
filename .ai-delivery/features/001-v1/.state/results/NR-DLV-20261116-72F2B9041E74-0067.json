@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0067",
+  "stage": "technical-solution",
+  "outcome": "upstream_exception",
+  "summary": "已按人工审批意见 HT-0018 在设计中新增 TD-019（部署时经平台机密提供的一次性设置口令 + 失败限流）防止初始管理员被抢先设置，并修订 TD-011、TD-018、技术上下文、治理约束表、组件清单、关键流程、/setup 路由与定位约定、数据库数据契约（IQA-016）、安全、配置、运维要点、验证矩阵、Quickstart、Runbook 与开放决策，在 docs/dependencies.json 新增 test 机密 INITIAL_SETUP_TOKEN；因 spec 的 FR-031、SC-007、IQA-016、AC-021 尚未描述设置口令字段及口令缺失/错误被拒的行为与验收步骤，按人工指示提出回退 specification。",
+  "artifacts": [
+    {
+      "path": ".ai-delivery/features/001-v1/design.md"
+    },
+    {
+      "path": "docs/dependencies.json"
+    }
+  ],
+  "upstream": {
+    "targetNodeId": "specification",
+    "reasonType": "unsafe",
+    "evidence": "人工审批意见 HT-DLV-20261116-72F2B9041E74-0018 拒绝上一版设计：'设置初始管理员'入口对公网匿名开放且无防抢占措施，从部署完成到首次提交之间任何拿到地址的人都能把自己设为管理员，生产同样如此，'不是可以接受的产品行为'，并指示'如果需要调整规格中 FR-031、SC-007、IQA-016 的表述，请按流程提出上游回退'。现行 spec FR-031 规定该流程只要求登录名、凭据、姓名（输入校验同 FR-001），IQA-016 情形①只用这三项完成设置，AC-021 与 SC-007 也未包含任何授权前提；本设计 TD-019 新增的用户可见行为——首次设置必须填写部署时由人经平台机密提供的设置口令（INITIAL_SETUP_TOKEN），口令缺失或错误时拒绝且不创建账号、连续失败被限流、口令未提供时流程无法完成——在 spec 中没有对应的功能需求与可独立执行的验收场景（宪章「测试与质量」要求每项用户可见能力有验收场景，「交付治理」要求可追踪）。建议 specification 修订：FR-031 增加'须提供部署时提供的一次性设置口令，口令缺失或错误时拒绝且不创建账号'；SC-007 明确由被授权的人（持有部署口令者）完成首次设置，提供口令属于部署流程而非手工改数据或配置；IQA-016 情形①增加口令缺失与口令错误各提交一次被拒且不创建账号的步骤，并在前置条件中说明设置口令由人在部署时提供；AC-021 同步。设计已按该行为完成（design.md TD-019），spec 修订后只需同步追踪编号。",
+    "changesApprovedIntent": false
+  }
+}

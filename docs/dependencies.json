@@ -39,6 +39,14 @@
         "test"
       ],
       "required": true
+    },
+    {
+      "name": "INITIAL_SETUP_TOKEN",
+      "purpose": "测试环境部署的一次性设置口令（TD-019，人工审批意见 HT-DLV-20261116-72F2B9041E74-0018）：应用读取后只以摘要保存，“设置初始管理员”流程只接受携带该口令的提交，防止部署后被他人抢先设置管理员；Independent QA 在 IQA-016 情形①中用它完成首次设置。应用要求不少于 16 个字符；不得出现在日志、截图或证据明文中。",
+      "environments": [
+        "test"
+      ],
+      "required": true
     }
   ]
 }
