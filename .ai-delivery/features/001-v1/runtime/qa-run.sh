@@ -2,10 +2,14 @@
 # Independent QA 执行脚本（DLV-20261116-72F2B9041E74 · 内部 IT 工单系统 · Feature 001-v1）
 # 契约：工作目录为空的临时目录；stdin 为 /dev/null；只写工作目录、QA_RESULT_PATH、QA_EVIDENCE_DIR。
 # 平台变量：QA_DELIVERY_ID、QA_CANDIDATE_SHA、QA_BASE_URL、QA_HEALTH_PATH、QA_RESULT_PATH、QA_EVIDENCE_DIR，
-#           以及 ticket-db test 实例的 AIDH_DEP_TICKET_DB_*（以 QA 工作负载身份 + Entra 令牌访问，TLS 校验开启）。
-# 场景：IQA-001～IQA-014（spec.md「验收场景」），计划见同目录上一级 tasks-qa.md。
-# IQA-015 按人工澄清答案 HT-DLV-20261116-72F2B9041E74-0010（QD-001）延后到后续迭代验证，本脚本不执行、不判定；
-# 脚本只维护供下一迭代核对的持久基线（不计入场景、缺陷或测试缺口）。
+#           以及 ticket-db test 实例的 AIDH_DEP_TICKET_DB_*（以 QA 工作负载身份 + Entra 令牌访问，TLS 校验开启），
+#           test 环境应用机密 AIDH_SECRET_INITIAL_ADMIN_LOGIN_NAME / _PASSWORD / _DISPLAY_NAME 与 AIDH_SECRET_INITIAL_SETUP_TOKEN
+#           （TD-018、TD-019；只在内存中使用，结果、证据、日志与截图中一律遮挡）。
+# 场景：IQA-016 最先执行，随后 IQA-001～IQA-014（spec.md「验收场景」），计划见同目录上一级 tasks-qa.md。
+# 账号来源（人工审批意见 HT-DLV-20261116-72F2B9041E74-0016）：只使用业务方提供的初始管理员；员工与 IT 同事账号由该管理员经页面创建，
+# 脚本不向数据库写入任何账号。
+# IQA-015 不在 V1 执行范围（人工澄清答案 HT-DLV-20261116-72F2B9041E74-0014；此前 HT-DLV-20261116-72F2B9041E74-0010），本脚本不执行、不判定；
+# 脚本只维护供后续迭代核对的持久基线（不计入场景、缺陷或测试缺口）。
 set -uo pipefail
 
 WORK_DIR="$(pwd)"
@@ -36,7 +40,8 @@ PY
 
 missing=""
 for v in QA_DELIVERY_ID QA_CANDIDATE_SHA QA_BASE_URL QA_HEALTH_PATH QA_RESULT_PATH QA_EVIDENCE_DIR \
-         AIDH_DEP_TICKET_DB_HOST AIDH_DEP_TICKET_DB_DATABASE AIDH_DEP_TICKET_DB_USER; do
+         AIDH_DEP_TICKET_DB_HOST AIDH_DEP_TICKET_DB_PORT AIDH_DEP_TICKET_DB_DATABASE AIDH_DEP_TICKET_DB_USER \
+         AIDH_SECRET_INITIAL_ADMIN_LOGIN_NAME AIDH_SECRET_INITIAL_ADMIN_PASSWORD AIDH_SECRET_INITIAL_ADMIN_DISPLAY_NAME; do
   if [ -z "${!v:-}" ]; then missing="$missing $v"; fi
 done
 if [ -z "${QA_RESULT_PATH:-}" ]; then
@@ -140,9 +145,30 @@ const URG = { LOW: '低', MEDIUM: '中', HIGH: '高' };
 
 const TOK = crypto.randomBytes(3).toString('hex');
 const P = `iq${TOK}-`; // 本次运行的合成数据前缀
+// test 环境应用机密（TD-018、TD-019）：只在内存中使用；任何写出的文本都先经 redact() 遮挡
+const SEC = {
+  login: (process.env.AIDH_SECRET_INITIAL_ADMIN_LOGIN_NAME ?? '').trim(),
+  password: process.env.AIDH_SECRET_INITIAL_ADMIN_PASSWORD ?? '',
+  display: (process.env.AIDH_SECRET_INITIAL_ADMIN_DISPLAY_NAME ?? '').trim(),
+  token: process.env.AIDH_SECRET_INITIAL_SETUP_TOKEN ?? '',
+};
+const MASK = '«已遮挡»';
+const SECRET_VALUES = [...new Set([SEC.login, SEC.password, SEC.display, SEC.token, SEC.token.trim()].filter(v => v && v.length >= 3))]
+  .sort((a, b) => b.length - a.length);
+function redact(v) {
+  let t = String(v);
+  for (const sv of SECRET_VALUES) {
+    t = t.split(sv).join(MASK);
+    const j = JSON.stringify(sv).slice(1, -1);
+    if (j !== sv) t = t.split(j).join(MASK);
+    const h = sv.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    if (h !== sv) t = t.split(h).join(MASK);
+  }
+  return t;
+}
 const runLog = [];
-function rlog(msg) { const line = `[${new Date().toISOString()}] ${msg}`; runLog.push(line); console.log(line); }
-function writeEvd(name, content) { try { fs.writeFileSync(path.join(EVD, name), content); } catch (e) { rlog(`写证据失败 ${name}: ${e.message}`); } }
+function rlog(msg) { const line = redact(`[${new Date().toISOString()}] ${msg}`); runLog.push(line); console.log(line); }
+function writeEvd(name, content) { try { fs.writeFileSync(path.join(EVD, name), redact(content)); } catch (e) { rlog(`写证据失败 ${name}: ${e.message}`); } }
 
 // ---------------- 时间（公司时区 Asia/Shanghai，UTC+8，无夏令时；design TD-009） ----------------
 const pad = n => String(n).padStart(2, '0');
@@ -157,7 +183,7 @@ const pool = new pg.Pool({
   host: process.env.AIDH_DEP_TICKET_DB_HOST,
   database: process.env.AIDH_DEP_TICKET_DB_DATABASE,
   user: process.env.AIDH_DEP_TICKET_DB_USER,
-  port: 5432,
+  port: Number(process.env.AIDH_DEP_TICKET_DB_PORT),
   ssl: { rejectUnauthorized: true },
   max: 4,
   password: async () => (await cred.getToken(DB_SCOPE)).token,
@@ -165,12 +191,6 @@ const pool = new pg.Pool({
 const q = async (sql, params = []) => (await pool.query(sql, params)).rows;
 const num = v => (v === null || v === undefined ? null : Number(v));
 
-async function mkUser(login, display, role, password = `Pw-${crypto.randomBytes(12).toString('hex')}`) {
-  const hash = bcrypt.hashSync(password, 10);
-  const r = await q('INSERT INTO app_user(login_name,password_hash,display_name,role,created_at) VALUES($1,$2,$3,$4,now()) RETURNING id',
-    [login, hash, display, role]);
-  return { id: num(r[0].id), login, display, role, password };
-}
 async function mkCat(name) {
   const r = await q('INSERT INTO category(name,active,created_at) VALUES($1,TRUE,now()) RETURNING id', [name]);
   return { id: num(r[0].id), name };
@@ -201,7 +221,8 @@ async function cleanupPrefix(prefix) {
   await q(`DELETE FROM ticket WHERE id IN ${tickets}`, [p]);
   await q('DELETE FROM category WHERE name LIKE $1', [p]);
   await q(`UPDATE app_user SET created_by = NULL WHERE created_by IN ${users}`, [p]);
-  await q('DELETE FROM app_user WHERE login_name LIKE $1', [p]);
+  // 只清理本次运行经页面创建的带前缀合成账号；业务方提供的初始管理员永不清理（TD-018）
+  await q('DELETE FROM app_user WHERE login_name LIKE $1 AND login_name <> $2', [p, SEC.login]);
 }
 async function cleanupStale() {
   const rows = await q(`SELECT DISTINCT substring(login_name from '^(iq[0-9a-f]{6}-)') AS p FROM app_user
@@ -222,9 +243,11 @@ let envProblem = null;
 function netlog(line) { if (cur) cur.net.push(`[${new Date().toISOString()}] ${line}`); }
 function cp(step, ok, observation, kind = 'defect') {
   const passed = !!ok;
-  cur.checkpoints.push({ step, passed, observation: String(observation).slice(0, 1500) });
-  cur.log.push(`${passed ? 'PASS' : 'FAIL'} | ${step} | ${observation}`);
-  if (!passed) cur.failures.push({ step, observation: String(observation).slice(0, 600), kind });
+  const obs = redact(observation);
+  cur.checkpoints.push({ step, passed, observation: obs.slice(0, 1500) });
+  cur.log.push(`${passed ? 'PASS' : 'FAIL'} | ${step} | ${obs}`);
+  if (!passed) cur.failures.push({ step, observation: obs.slice(0, 600), kind });
+  if (!passed && kind === 'env') envProblem = envProblem ?? `${cur.id}：${step}：${obs.slice(0, 600)}`;
   return passed;
 }
 function need(step, ok, observation, kind = 'defect') { if (!cp(step, ok, observation, kind)) throw new Halt(step); }
@@ -232,7 +255,16 @@ async function shot(page, label) {
   if (!page) return;
   cur.shotN += 1;
   const name = `${cur.id}-${pad(cur.shotN)}-${label.replace(/[^\w一-龥-]+/g, '_').slice(0, 40)}.png`;
-  try { await page.screenshot({ path: path.join(EVD, name), fullPage: true }); cur.files.push(name); } catch (e) { cur.log.push(`截图失败 ${label}: ${e.message}`); }
+  try {
+    // 遮挡机密：页面文本中出现的机密值替换为遮挡标记；值含机密的输入框在截图中涂黑（密码型输入框本身不显示明文）
+    await page.evaluate(({ secrets, mask }) => {
+      const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      for (let n = w.nextNode(); n; n = w.nextNode()) for (const sv of secrets) if (n.nodeValue.includes(sv)) n.nodeValue = n.nodeValue.split(sv).join(mask);
+      for (const el of document.querySelectorAll('input, textarea')) if (secrets.some(sv => (el.value ?? '').includes(sv))) el.setAttribute('data-qa-mask', '1');
+    }, { secrets: SECRET_VALUES, mask: MASK }).catch(() => {});
+    await page.screenshot({ path: path.join(EVD, name), fullPage: true, mask: [page.locator('[data-qa-mask]')] });
+    cur.files.push(name);
+  } catch (e) { cur.log.push(`截图失败 ${label}: ${e.message}`); }
 }
 async function saveHtml(page, label) {
   if (!page) return;
@@ -277,8 +309,8 @@ async function scenario(id, title, fn) {
 // IQA-015 延后（人工澄清答案 HT-DLV-20261116-72F2B9041E74-0010 / QD-001）：只维护持久基线，供下一迭代候选部署到同一 test 库后核对。
 // 不进入 scenarios，不产生 defects / testGaps；观察结果只写入证据。
 const deferredNotes = [];
-const EXPECTED_SCENARIOS = 14;
-const DEFERRED_NOTE = 'IQA-015（AC-020）未在本次 qa-run 执行：人工澄清答案 HT-DLV-20261116-72F2B9041E74-0010（QD-001）决定延后到后续迭代，以下一迭代候选部署到同一 test 库的真实升级为重新部署事实依据；第一版以 FR-029/FR-030 的设计证据为依据';
+const EXPECTED_SCENARIOS = 15; // IQA-001～IQA-014 与 IQA-016
+const DEFERRED_NOTE = 'IQA-015（AC-020）未在本次 qa-run 执行：按人工澄清答案 HT-DLV-20261116-72F2B9041E74-0014（QD-001 答案：V1 不验证升级或重新部署后的数据保留，改到后续迭代通过真实升级来验证），IQA-015 不在 V1 执行范围；第一版以 FR-029/FR-030 的设计证据为依据';
 async function maintainDeferredBaseline() {
   cur = { id: 'IQA-015-deferred', title: '后续迭代基线维护', checkpoints: [], failures: [], log: [], net: [], files: [], shotN: 0, server5xx: [], actors: [] };
   if (Date.now() - T0 > TIME_BUDGET_MS) {
@@ -431,18 +463,234 @@ const acc = {};
 let baseCat;
 let preReport = null;
 
+// 管理员经「账号管理」页面创建账号（FR-001；人工审批意见 HT-0016：QA 不向数据库写入任何账号）
+async function createUserUI(admin, login, display, role, password = `Pw-${crypto.randomBytes(12).toString('hex')}`) {
+  await go(admin.page, '/admin/users');
+  await admin.page.getByTestId('user-login').fill(login);
+  await admin.page.getByTestId('user-password').fill(password);
+  await admin.page.getByTestId('user-display').fill(display);
+  await admin.page.getByTestId('user-role').selectOption(role);
+  await submit(admin.page, admin.page.getByTestId('user-create'));
+  const r = await q('SELECT id, role FROM app_user WHERE login_name=$1', [login]);
+  if (r.length !== 1 || r[0].role !== role) throw new Error(`经页面创建账号 ${login}（${role}）未成功：库中=${JSON.stringify(r)}，页面 URL=${admin.page.url()}`);
+  return { id: num(r[0].id), login, display, role, password };
+}
+
+let a0Problem = null; // IQA-016 之后初始管理员不可用的原因
 async function setup() {
-  await cleanupStale();
-  acc.A0 = await mkUser(`${P}admin`, `${P}种子管理员`, 'ADMIN');
-  acc.E1 = await mkUser(`${P}e1`, `${P}员工甲`, 'EMPLOYEE');
-  acc.E2 = await mkUser(`${P}e2`, `${P}员工乙`, 'EMPLOYEE');
-  acc.T1 = await mkUser(`${P}t1`, `${P}IT甲`, 'IT_STAFF');
-  acc.T2 = await mkUser(`${P}t2`, `${P}IT乙`, 'IT_STAFF');
-  acc.U1 = await mkUser(`${P}u1`, `${P}待设IT`, 'EMPLOYEE');
-  acc.S1 = await mkUser(`${P}s1`, `${P}报表IT一`, 'IT_STAFF');
-  acc.S2 = await mkUser(`${P}s2`, `${P}报表IT二`, 'IT_STAFF');
-  baseCat = await mkCat(`${P}基础类别`);
-  rlog(`合成数据前缀 ${P}，账号与基础类别已准备`);
+  cur = { id: 'setup', title: '前置：经页面创建合成账号', checkpoints: [], failures: [], log: [], net: [], files: [], shotN: 0, server5xx: [], actors: [] };
+  try {
+    await cleanupStale();
+    const admin = await actor('初始管理员A0', acc.A0);
+    acc.E1 = await createUserUI(admin, `${P}e1`, `${P}员工甲`, 'EMPLOYEE');
+    acc.E2 = await createUserUI(admin, `${P}e2`, `${P}员工乙`, 'EMPLOYEE');
+    acc.T1 = await createUserUI(admin, `${P}t1`, `${P}IT甲`, 'IT_STAFF');
+    acc.T2 = await createUserUI(admin, `${P}t2`, `${P}IT乙`, 'IT_STAFF');
+    acc.U1 = await createUserUI(admin, `${P}u1`, `${P}待设IT`, 'EMPLOYEE');
+    acc.S1 = await createUserUI(admin, `${P}s1`, `${P}报表IT一`, 'IT_STAFF');
+    acc.S2 = await createUserUI(admin, `${P}s2`, `${P}报表IT二`, 'IT_STAFF');
+    baseCat = await mkCat(`${P}基础类别`);
+    rlog(`合成数据前缀 ${P}：初始管理员经页面创建员工/IT 同事账号，基础类别已准备`);
+  } finally {
+    for (const a of cur.actors) { try { await a.ctx.close(); } catch { /* ignore */ } }
+    writeEvd('setup-accounts.log', ['# 前置：初始管理员经「账号管理」页面创建合成账号', `prefix=${P}`, '', ...cur.log, '',
+      '## 网络请求与响应（方法 URL -> 状态码；不记录请求体与凭据）', ...cur.net].join('\n'));
+  }
+}
+
+// ================= IQA-016（最先执行） =================
+const SETUP_RE = /data-testid="setup-closed"/;
+async function setupView(page) {
+  return {
+    form: (await page.getByTestId('setup-submit').count()) > 0,
+    closed: (await page.getByTestId('setup-closed').count()) > 0,
+    tokenMissing: (await page.getByTestId('setup-token-missing').count()) > 0,
+    throttled: (await page.getByTestId('setup-throttled').count()) > 0,
+    err: {
+      setupToken: await txt(page, 'field-error-setupToken'), loginName: await txt(page, 'field-error-loginName'),
+      password: await txt(page, 'field-error-password'), displayName: await txt(page, 'field-error-displayName'),
+    },
+  };
+}
+async function submitSetup(page, f) {
+  await page.getByTestId('setup-token').fill(f.token ?? '');
+  await page.getByTestId('setup-login-name').fill(f.login ?? '');
+  await page.getByTestId('setup-password').fill(f.password ?? '');
+  await page.getByTestId('setup-display-name').fill(f.display ?? '');
+  const respP = page.waitForResponse(r => new URL(r.url()).pathname === '/setup' && r.request().method() === 'POST', { timeout: 45000 });
+  await submit(page, page.getByTestId('setup-submit'));
+  const resp = await respP;
+  const html = await page.content();
+  const echoed = [f.password, f.token].filter(v => v && v.length >= 3 && html.includes(v)).length;
+  return { status: resp.status(), url: page.url(), echoed, pwEmpty: (await page.getByTestId('setup-password').count()) ? (await page.getByTestId('setup-password').inputValue()) === '' : true,
+    tokenEmpty: (await page.getByTestId('setup-token').count()) ? (await page.getByTestId('setup-token').inputValue()) === '' : true, ...(await setupView(page)) };
+}
+const userCount = async login => num((await q('SELECT count(*) c FROM app_user WHERE login_name=$1', [login]))[0].c);
+const usableAdmins = async () => num((await q("SELECT count(*) c FROM app_user WHERE role='ADMIN' AND password_hash IS NOT NULL"))[0].c);
+async function accountDigest() {
+  const rows = await q('SELECT id, login_name, display_name, role, password_hash, created_by FROM app_user ORDER BY id');
+  return { n: rows.length, digest: crypto.createHash('sha256').update(JSON.stringify(rows)).digest('hex') };
+}
+async function secretAdminRow() {
+  const r = await q('SELECT id, role, display_name, password_hash FROM app_user WHERE login_name=$1', [SEC.login]);
+  return r[0] ? { id: num(r[0].id), role: r[0].role, display: r[0].display_name, hash: r[0].password_hash } : null;
+}
+// 对关闭状态的 /setup 直接 POST（携带登录页的 CSRF 令牌，避免把 CSRF 拒绝误判为流程关闭）
+async function postClosedSetup(a, form) {
+  await go(a.page, '/login');
+  const r = await postForm(a, '/setup', form);
+  return { ...r, closedPage: SETUP_RE.test(r.body) };
+}
+async function regCount(page) { return page.locator('a, button').filter({ hasText: /注册|register|sign\s*up/i }).count(); }
+
+async function iqa016() {
+  const anon = await actor('匿名');
+  await go(anon.page, '/login');
+  const linkShown = (await anon.page.getByTestId('setup-link').count()) > 0;
+  const reg = await regCount(anon.page);
+  const dbAdmins = await usableAdmins();
+  await shot(anon.page, 'situation-login-page');
+  const sit = dbAdmins === 0 ? 1 : 2;
+  cp('判定所处情形', true, `登录页“设置初始管理员”入口：${linkShown ? '显示' : '不显示'}；test 库中可用管理员（带凭据 ADMIN）数=${dbAdmins}；按此判定为情形${sit === 1 ? '①（尚无可用管理员）' : '②（已有可用管理员）'}`, 'info');
+  cp('登录入口无员工自助注册入口', reg === 0, `注册类链接/按钮数=${reg}`);
+  if (sit === 1) await iqa016First(anon, linkShown); else await iqa016Closed(anon, linkShown);
+}
+
+async function iqa016First(anon, linkShown) {
+  // 情形① 第 1 步：入口存在；留空登录名、缺少口令、错误口令各提交一次均被拒且不创建账号；最后以正确口令完成设置
+  need('情形①：登录入口显示“设置初始管理员”流程', linkShown, `入口链接数=${await anon.page.getByTestId('setup-link').count()}`);
+  if (!SEC.token) { need('情形①：取得部署时提供的一次性设置口令', false, '平台未注入 AIDH_SECRET_INITIAL_SETUP_TOKEN，无法执行首次设置（执行环境问题，需由人在平台依赖与机密任务中提供）', 'env'); }
+  await submit(anon.page, anon.page.getByTestId('setup-link'));
+  const v0 = await setupView(anon.page);
+  await shot(anon.page, 'setup-form');
+  need('情形①：打开设置初始管理员表单', v0.form && new URL(anon.page.url()).pathname === '/setup', `URL=${anon.page.url()}；表单=${v0.form}；关闭页=${v0.closed}`);
+  if (v0.tokenMissing) {
+    need('情形①：候选已获得部署时提供的设置口令', false,
+      '候选设置页显示“此部署未提供设置口令，暂不能完成设置”（setup-token-missing）：部署注入的 INITIAL_SETUP_TOKEN 不满足应用的有效口令要求（TD-019：去首尾空白后不少于 16 个字符）或未注入。'
+      + '属于部署机密取值问题，不是产品缺陷；需由人在平台依赖与机密任务中更正 test 环境的 INITIAL_SETUP_TOKEN 并重新部署候选后重跑。为避免消耗失败限流次数，本次未提交任何设置请求', 'env');
+  }
+  const tgt = { login: SEC.login, password: SEC.password, display: SEC.display };
+  const before = await userCount(SEC.login);
+  need('情形①：业务方提供的登录名尚未被占用', before === 0, `库中同名账号数=${before}（同名已存在时首次设置必然被拒，需由人更正机密值）`, 'gap');
+
+  const s1 = await submitSetup(anon.page, { token: SEC.token, login: '', password: SEC.password, display: SEC.display });
+  await shot(anon.page, 'empty-login-rejected');
+  if (s1.status === 429 || s1.throttled) need('情形①：设置请求未被限流', false, `HTTP ${s1.status}，页面提示尝试次数过多：此前的失败尝试已触发来源地址限流（15 分钟窗口），本次无法验证，等待窗口结束后重跑`, 'gap');
+  cp('情形①：留空登录名（正确口令）提交被拒并提示，流程仍可用', s1.status === 200 && !!s1.err.loginName && s1.form && (await usableAdmins()) === 0,
+    `HTTP ${s1.status}；登录名错误提示=${s1.err.loginName}；口令错误提示=${s1.err.setupToken}；表单仍可用=${s1.form}；可用管理员数=${await usableAdmins()}`);
+  cp('情形①：被拒后不回显密码与设置口令', s1.echoed === 0 && s1.pwEmpty && s1.tokenEmpty, `页面含明文次数=${s1.echoed}；密码框为空=${s1.pwEmpty}；口令框为空=${s1.tokenEmpty}`);
+
+  const s2 = await submitSetup(anon.page, { ...tgt, token: '' });
+  await shot(anon.page, 'token-missing-rejected');
+  cp('情形①：不填写设置口令提交被拒并提示，不创建账号，流程仍可用', s2.status === 200 && !!s2.err.setupToken && s2.form && (await userCount(SEC.login)) === 0 && (await usableAdmins()) === 0,
+    `HTTP ${s2.status}；口令错误提示=${s2.err.setupToken}；表单仍可用=${s2.form}；业务方登录名账号数=${await userCount(SEC.login)}`);
+  const wrong = `qa-wrong-token-${crypto.randomBytes(8).toString('hex')}`;
+  const s3 = await submitSetup(anon.page, { ...tgt, token: wrong });
+  await shot(anon.page, 'token-wrong-rejected');
+  cp('情形①：填写错误设置口令提交被拒并提示，不创建账号，流程仍可用', s3.status === 200 && !!s3.err.setupToken && s3.form && (await userCount(SEC.login)) === 0 && (await usableAdmins()) === 0,
+    `HTTP ${s3.status}；口令错误提示=${s3.err.setupToken}；表单仍可用=${s3.form}；业务方登录名账号数=${await userCount(SEC.login)}`);
+  cp('情形①：口令被拒后不回显密码与口令', s2.echoed + s3.echoed === 0 && s2.pwEmpty && s3.pwEmpty && s3.tokenEmpty, `页面含明文次数=${s2.echoed + s3.echoed}`);
+
+  const s4 = await submitSetup(anon.page, { ...tgt, token: SEC.token });
+  const row = await secretAdminRow();
+  const ok = (await anon.page.getByTestId('setup-success').count()) > 0 && new URL(anon.page.url()).pathname === '/login';
+  await shot(anon.page, 'setup-done');
+  need('情形①：填写正确设置口令后设置成功', ok && !!row && row.role === 'ADMIN' && !!row.hash && row.display === SEC.display,
+    `HTTP ${s4.status}；URL=${s4.url}；成功提示=${ok}；库中账号=${row ? `id=${row.id} role=${row.role} 有凭据=${!!row.hash} 姓名一致=${row.display === SEC.display}` : '无'}；字段错误=${JSON.stringify(s4.err)}`);
+  acc.A0 = { id: row.id, login: SEC.login, password: SEC.password, display: SEC.display, role: 'ADMIN' };
+
+  // 第 2 步：初始管理员登录并使用管理员功能
+  const admin = await actor('初始管理员');
+  const okLogin = await login(admin, acc.A0);
+  const nav = okLogin ? await navSet(admin.page) : [];
+  need('情形①：用业务方提供的凭据登录且具备管理员功能', okLogin && JSON.stringify(nav) === JSON.stringify(['nav-admin-users', 'nav-admin-categories', 'nav-report']), `登录=${okLogin}；导航=${nav.join(',')}`);
+  const emp = await createUserUI(admin, `${P}s16e`, `${P}IQA016员工`, 'EMPLOYEE').catch(e => ({ error: e.message }));
+  cp('情形①：初始管理员创建合成员工账号', !emp.error, emp.error ?? `已创建 id=${emp.id}`);
+  await shot(admin.page, 'admin-created-user');
+  const catName = `${P}IQA016类别`;
+  await go(admin.page, '/admin/categories');
+  await admin.page.getByTestId('category-new-name').fill(catName);
+  await submit(admin.page, admin.page.getByTestId('category-create'));
+  const catRows = await admin.page.locator(`[data-testid=category-row][data-category-name="${catName}"]`).count();
+  cp('情形①：初始管理员新增合成类别', catRows === 1, `类别行数=${catRows}`);
+  await shot(admin.page, 'admin-created-category');
+  const rep = await readReport(admin);
+  cp('情形①：初始管理员打开周报表', rep.httpStatus === 200 && !!rep.week, `HTTP ${rep.httpStatus}；报表周=${rep.week}`);
+  await shot(admin.page, 'admin-report');
+
+  // 第 3 步：退出后入口不显示；直接访问被拒；不能新增或接管账号
+  await logout(admin);
+  await go(admin.page, '/login');
+  const linkAfter = await admin.page.getByTestId('setup-link').count();
+  await shot(admin.page, 'login-after-setup');
+  cp('情形①：设置成功后登录入口不再显示该流程', linkAfter === 0, `入口链接数=${linkAfter}`);
+  const g = await go(admin.page, '/setup');
+  const gClosed = (await admin.page.getByTestId('setup-closed').count()) > 0 && (await admin.page.getByTestId('setup-submit').count()) === 0;
+  await shot(admin.page, 'setup-direct-access');
+  cp('情形①：直接访问该流程被拒绝', g === 403 && gClosed, `GET /setup → HTTP ${g}；关闭页=${gClosed}`);
+  const other = { login: `${P}s16x`, password: `Pw-${crypto.randomBytes(10).toString('hex')}`, display: `${P}另一管理员` };
+  const hashBefore = (await secretAdminRow())?.hash;
+  const pNew = await postClosedSetup(admin, { setupToken: SEC.token, loginName: other.login, password: other.password, displayName: other.display });
+  const pTake = await postClosedSetup(admin, { setupToken: SEC.token, loginName: SEC.login, password: other.password, displayName: `${P}接管` });
+  const after = await secretAdminRow();
+  cp('情形①：再次提交（另一组合成信息）被拒且不新增账号', pNew.status === 403 && pNew.closedPage && (await userCount(other.login)) === 0, `POST /setup → HTTP ${pNew.status}；关闭页=${pNew.closedPage}；合成账号数=${await userCount(other.login)}`);
+  cp('情形①：以初始管理员登录名提交被拒且不接管该账号', pTake.status === 403 && pTake.closedPage && after?.hash === hashBefore && after?.role === 'ADMIN' && after?.display === SEC.display,
+    `POST /setup → HTTP ${pTake.status}；关闭页=${pTake.closedPage}；凭据未变=${after?.hash === hashBefore}；身份=${after?.role}；姓名未变=${after?.display === SEC.display}`);
+
+  // 第 4 步：合成凭据登录失败；初始管理员仍可登录
+  const x = await actor('尝试者');
+  const okX = await login(x, other);
+  const okT = await login(x, { login: SEC.login, password: other.password });
+  await shot(x.page, 'synthetic-login-failed');
+  cp('情形①：用第 3 步尝试的合成凭据登录失败', !okX && !okT, `合成新管理员登录成功=${okX}；以接管密码登录初始管理员成功=${okT}`);
+  const okA = await login(x, acc.A0);
+  cp('情形①：初始管理员仍可用业务方提供的凭据登录', okA, `登录=${okA}`);
+  await shot(x.page, 'initial-admin-still-works');
+}
+
+async function iqa016Closed(anon, linkShown) {
+  // 情形②：入口不显示；直接访问及提交被拒；合成凭据登录失败；账号数据无新增或修改；已有管理员仍可登录
+  cp('情形②：登录入口不显示“设置初始管理员”流程', !linkShown, `入口链接数=${await anon.page.getByTestId('setup-link').count()}`);
+  const d0 = await accountDigest();
+  const row0 = await secretAdminRow();
+  const g = await go(anon.page, '/setup');
+  const gClosed = (await anon.page.getByTestId('setup-closed').count()) > 0 && (await anon.page.getByTestId('setup-submit').count()) === 0;
+  await shot(anon.page, 'setup-direct-access');
+  cp('情形②：直接访问该流程被拒绝', g === 403 && gClosed, `GET /setup → HTTP ${g}；关闭页=${gClosed}`);
+  const syn = { login: `${P}s16n`, password: `Pw-${crypto.randomBytes(10).toString('hex')}`, display: `${P}合成管理员` };
+  const tok = SEC.token || `qa-synthetic-token-${crypto.randomBytes(8).toString('hex')}`;
+  const pNew = await postClosedSetup(anon, { setupToken: tok, loginName: syn.login, password: syn.password, displayName: syn.display });
+  const pTake = await postClosedSetup(anon, { setupToken: tok, loginName: SEC.login, password: syn.password, displayName: `${P}接管` });
+  const pNoTok = await postClosedSetup(anon, { setupToken: '', loginName: SEC.login, password: syn.password, displayName: `${P}接管` });
+  writeEvd('IQA-016-closed-post.html', pNew.body); cur.files.push('IQA-016-closed-post.html');
+  cp('情形②：用一组合成信息提交被拒', pNew.status === 403 && pNew.closedPage, `POST /setup → HTTP ${pNew.status}；关闭页=${pNew.closedPage}`);
+  cp('情形②：以已有管理员登录名提交（携带与不携带口令）被拒', pTake.status === 403 && pTake.closedPage && pNoTok.status === 403 && pNoTok.closedPage,
+    `携带口令 → HTTP ${pTake.status} 关闭页=${pTake.closedPage}；不携带口令 → HTTP ${pNoTok.status} 关闭页=${pNoTok.closedPage}`);
+  const x = await actor('尝试者');
+  const okS = await login(x, syn);
+  const okT = await login(x, { login: SEC.login, password: syn.password });
+  await shot(x.page, 'synthetic-login-failed');
+  cp('情形②：用第 2 步提交的合成凭据登录失败', !okS && !okT, `合成管理员登录成功=${okS}；以接管密码登录已有管理员成功=${okT}`);
+  const d1 = await accountDigest();
+  const row1 = await secretAdminRow();
+  cp('情形②：账号数据在提交前后没有新增或修改', d0.n === d1.n && d0.digest === d1.digest && (await userCount(syn.login)) === 0,
+    `账号行数 ${d0.n} → ${d1.n}；全部账号行摘要${d0.digest === d1.digest ? '一致' : '不一致'}；合成登录名账号数=${await userCount(syn.login)}；业务方登录名账号凭据未变=${row0?.hash === row1?.hash}`);
+  const okA = await login(x, { login: SEC.login, password: SEC.password });
+  const nav = okA ? await navSet(x.page) : [];
+  await shot(x.page, 'existing-admin-login');
+  if (okA && JSON.stringify(nav) === JSON.stringify(['nav-admin-users', 'nav-admin-categories', 'nav-report'])) {
+    cp('情形②：已有管理员仍可用业务方提供的凭据登录', true, `登录成功；导航=${nav.join(',')}`);
+    acc.A0 = { id: row1.id, login: SEC.login, password: SEC.password, display: SEC.display, role: 'ADMIN' };
+    return;
+  }
+  // 区分产品缺陷与机密取值问题（只读核对，不输出哈希或机密）
+  const match = row1?.hash ? bcrypt.compareSync(SEC.password, row1.hash) : false;
+  if (!row1 || row1.role !== 'ADMIN' || !row1.hash || !match) {
+    a0Problem = `业务方提供的初始管理员机密与 test 库中已设置的管理员不一致（库中该登录名：${row1 ? `身份=${row1.role} 有凭据=${!!row1.hash} 密码匹配=${match}` : '不存在'}）`;
+    cp('情形②：已有管理员仍可用业务方提供的凭据登录', false, `${a0Problem}；不是产品缺陷，需由人在平台依赖与机密任务中更正 INITIAL_ADMIN_* 机密，或改绑尚无可用管理员的 test 库（design 运维说明）`, 'gap');
+  } else {
+    cp('情形②：已有管理员仍可用业务方提供的凭据登录', false, `库中账号与机密一致（身份 ADMIN、密码匹配），但登录${okA ? `后导航=${nav.join(',')}` : '失败'}`);
+  }
 }
 
 // ================= IQA-001 =================
@@ -1144,8 +1392,8 @@ async function iqa015() {
     cp('查找重新部署前建立的基线', true, '未找到本交付的 IQA-015 基线，本次运行建立基线');
     const K = `${kBase}-${crypto.randomBytes(2).toString('hex')}`;
     const nonce = crypto.randomBytes(8).toString('hex');
-    const emp = await mkUser(`${K}-emp`, `${K} 基线员工`, 'EMPLOYEE', pw(K, nonce, `${K}-emp`));
-    const it = await mkUser(`${K}-it`, `${K} 基线IT`, 'IT_STAFF', pw(K, nonce, `${K}-it`));
+    const emp = await createUserUI(admin, `${K}-emp`, `${K} 基线员工`, 'EMPLOYEE', pw(K, nonce, `${K}-emp`));
+    const it = await createUserUI(admin, `${K}-it`, `${K} 基线IT`, 'IT_STAFF', pw(K, nonce, `${K}-it`));
     const cat = await mkCat(`${K}-类别`);
     const e = await actor('基线员工', emp);
     const t = await actor('基线IT', it);
@@ -1245,8 +1493,8 @@ async function main() {
   if (!envProblem) {
     browser = await chromium.launch();
     try {
-      await setup();
-      await iqa013Prepare();
+      // IQA-016 最先执行（spec 测试策略）：判定情形并取得可用的初始管理员 A0；不为改变环境状态而改库或改配置
+      await scenario('IQA-016', '业务方获得初始管理员凭据并登录', iqa016);
       const list = [
         ['IQA-001', '管理员创建账号与登录', iqa001], ['IQA-002', '员工提交工单与必填校验', iqa002], ['IQA-003', '员工查看进度与工单隔离', iqa003],
         ['IQA-004', '补充说明与回复的双向沟通', iqa004], ['IQA-005', 'IT 同事查看全部工单、认领与分派', iqa005], ['IQA-006', '状态修改', iqa006],
@@ -1254,8 +1502,18 @@ async function main() {
         ['IQA-010', '管理功能与报表的访问控制', iqa010], ['IQA-011', '关键词搜索', iqa011], ['IQA-012', '条件筛选与组合', iqa012],
         ['IQA-013', '周报表数量与处理时长', iqa013], ['IQA-014', '超过 3 天未解决积压数', iqa014],
       ];
-      for (const [id, title, fn] of list) await scenario(id, title, fn);
-      await maintainDeferredBaseline();
+      if (envProblem) {
+        rlog(`执行环境问题，其余场景不执行：${envProblem}`);
+      } else if (!acc.A0) {
+        // 按人工审批意见 HT-0016，QA 不自备或插入管理员账号；没有可用的初始管理员时其余场景无法执行
+        const why = a0Problem ?? 'IQA-016 未能取得可用的初始管理员（见 IQA-016.log）';
+        for (const [id, title] of list) await scenario(id, title, async () => need('前置：可用的初始管理员', false, `${why}；按人工审批意见 HT-DLV-20261116-72F2B9041E74-0016 QA 不自备管理员，本场景未执行`, 'gap'));
+      } else {
+        await setup();
+        await iqa013Prepare();
+        for (const [id, title, fn] of list) await scenario(id, title, fn);
+        await maintainDeferredBaseline();
+      }
     } catch (e) {
       rlog(`准备阶段失败：${e.stack ?? e}`);
       if (isEnvError(String(e.message))) envProblem = envProblem ?? `准备阶段：${e.message}`;
@@ -1269,10 +1527,10 @@ async function main() {
   writeEvd('node-run.log', runLog.join('\n'));
   let files = [];
   try { files = fs.readdirSync(EVD).sort(); } catch { /* ignore */ }
-  const evidence = ['identity.json', 'health-attempts.log', 'node-run.log', ...files.filter(f => /^IQA-\d{3}\.log$/.test(f)),
+  const evidence = ['identity.json', 'health-attempts.log', 'node-run.log', ...files.filter(f => f === 'setup-accounts.log' || /^IQA-\d{3}\.log$/.test(f)),
     DEFERRED_NOTE, ...deferredNotes, ...(files.includes('IQA-015-deferred-baseline.log') ? ['IQA-015-deferred-baseline.log'] : [])];
   let finalDefects = defects, finalGaps = testGaps;
-  const deferredSummary = '；IQA-015 按人工澄清答案 HT-DLV-20261116-72F2B9041E74-0010 延后到后续迭代验证，本次未执行';
+  const deferredSummary = '；IQA-015 按人工澄清答案 HT-DLV-20261116-72F2B9041E74-0014 不在 V1 执行范围，本次未执行';
   if (envProblem) { evidence.unshift(`执行环境问题：${envProblem}`); finalDefects = []; finalGaps = []; }
   const allPassed = !envProblem && scenarios.length === EXPECTED_SCENARIOS && scenarios.every(s => s.passed) && finalDefects.length === 0 && finalGaps.length === 0;
   const failed = scenarios.filter(s => !s.passed).map(s => s.id);
@@ -1288,10 +1546,10 @@ async function main() {
     bugfixResults: [],
     scenarios,
   };
-  let json = JSON.stringify(result, null, 2);
+  let json = redact(JSON.stringify(result, null, 2));
   if (Buffer.byteLength(json) > 250000) {
     for (const s of result.scenarios) s.checkpoints = s.checkpoints.map(c => ({ ...c, observation: c.observation.slice(0, 200) }));
-    json = JSON.stringify(result);
+    json = redact(JSON.stringify(result));
   }
   fs.writeFileSync(RESULT, json);
   rlog(`结果已写出：passed=${allPassed}`);
