@@ -1,0 +1,82 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0082-b01",
+  "stage": "coding",
+  "outcome": "needs_decision",
+  "summary": "按 upstream-change 增量实现：一次性设置初始管理员流程（设置口令 + 失败限流）及其单元 / 切片测试、删除启动引导、schema 配置与端口读取、机密策略测试、遗留管理员登录集成测试、数据保留集成测试，完成 15 项任务并在真实 ticket-db dev 实例上验证通过；因 dev 绑定身份无权创建 schema（TD-016 前置条件不满足），一次性 schema 上的集成 / 功能测试（T065、T066、T021）及依赖它们的 T067、T068、T059 受阻，需人决定。",
+  "artifacts": [
+    { "path": ".ai-delivery/features/001-v1/tasks-implementation.md" },
+    { "path": ".ai-delivery/features/001-v1/reports/implementation.md" },
+    { "path": ".ai-delivery/features/001-v1/runtime/developer-functional-run.sh" },
+    { "path": "src/main/resources/application.yml" },
+    { "path": "src/main/java/com/ithelpdesk/config/AppProperties.java" },
+    { "path": "src/main/java/com/ithelpdesk/config/SecurityConfig.java" },
+    { "path": "src/main/java/com/ithelpdesk/auth/LoginController.java" },
+    { "path": "src/main/resources/templates/login.html" },
+    { "path": "src/main/java/com/ithelpdesk/user/UserRepository.java" },
+    { "path": "src/main/java/com/ithelpdesk/user/InitialAdminBootstrap.java" },
+    { "path": "src/main/java/com/ithelpdesk/user/BootstrapProperties.java" },
+    { "path": "src/main/java/com/ithelpdesk/user/SetupTokenVerifier.java" },
+    { "path": "src/main/java/com/ithelpdesk/user/SetupAttemptLimiter.java" },
+    { "path": "src/main/java/com/ithelpdesk/user/SetupForm.java" },
+    { "path": "src/main/java/com/ithelpdesk/user/SetupClosedException.java" },
+    { "path": "src/main/java/com/ithelpdesk/user/InitialAdminSetupService.java" },
+    { "path": "src/main/java/com/ithelpdesk/user/InitialAdminSetupController.java" },
+    { "path": "src/main/resources/templates/setup/form.html" },
+    { "path": "src/main/resources/templates/setup/closed.html" },
+    { "path": "src/test/java/com/ithelpdesk/user/InitialAdminBootstrapTest.java" },
+    { "path": "src/test/java/com/ithelpdesk/user/InitialAdminBootstrapIT.java" },
+    { "path": "src/test/java/com/ithelpdesk/auth/LegacyAdminLoginIT.java" },
+    { "path": "src/test/java/com/ithelpdesk/auth/SecurityConfigTest.java" },
+    { "path": "src/test/java/com/ithelpdesk/support/WebSliceTestBase.java" },
+    { "path": "src/test/java/com/ithelpdesk/config/AppPropertiesTest.java" },
+    { "path": "src/test/java/com/ithelpdesk/SecretUsagePolicyTest.java" },
+    { "path": "src/test/java/com/ithelpdesk/user/InitialAdminSetupServiceTest.java" },
+    { "path": "src/test/java/com/ithelpdesk/user/InitialAdminSetupControllerTest.java" },
+    { "path": "src/test/java/com/ithelpdesk/user/SetupTokenVerifierTest.java" },
+    { "path": "src/test/java/com/ithelpdesk/user/SetupAttemptLimiterTest.java" },
+    { "path": "src/test/java/com/ithelpdesk/user/InitialAdminSetupIT.java" },
+    { "path": "src/test/java/com/ithelpdesk/DataRetentionIT.java" },
+    { "path": "e2e/playwright.config.ts" },
+    { "path": "e2e/support/db.ts" },
+    { "path": "e2e/support/schema.ts" },
+    { "path": "e2e/support/schema.teardown.ts" },
+    { "path": "e2e/tests/iqa-016-initial-admin.spec.ts" }
+  ],
+  "progress": {
+    "completedTaskIds": ["T004", "T009", "T010", "T011", "T014", "T018", "T020", "T058", "T061", "T062", "T063", "T064", "T069", "T070", "T071"],
+    "blockedTaskIds": ["T065", "T066", "T021", "T067", "T068", "T059"]
+  },
+  "decisionsNeeded": [
+    {
+      "id": "DEC-CODING-001",
+      "level": "technical",
+      "question": "ticket-db 的 dev 绑定身份无权在项目库中创建 schema，TD-016 规定的一次性 schema 测试无法在真实实例上执行。证据：Agent Pod 以平台注入的 AIDH_DEP_TICKET_DB_* 和 Entra 令牌连接 dev 实例（PostgreSQL 16.15），执行 CREATE SCHEMA 返回 ERROR: permission denied for database db_9d4275ee58c5_dev（SQLSTATE 42501）。has_database_privilege(current_user, current_database(), 'CREATE') 为 false，has_schema_privilege(current_user, 'public', 'CREATE') 为 true，public schema 的所有者是 azure_pg_admin。InitialAdminSetupIT 的前置探测、开发者功能脚本 8081 实例的 Flyway 建 schema 都因此失败。受影响的是 FR-031 / IQA-016 首次设置完整流程在真实实例上的开发者验证（T065、T066、T021），以及依赖它们的 T067、T068、T059；其余 39 个集成测试和 IQA-001～IQA-014 功能测试在同一实例上都已通过。应如何处理？",
+      "affects": ["T065", "T066", "T021", "T067", "T068", "T059", "TD-016", "FR-031", "IQA-016", "AC-021"],
+      "options": [
+        {
+          "key": "A",
+          "label": "保持 TD-016 不变：由平台为 ticket-db 的 dev 绑定身份授予项目库的 CREATE 权限（能创建并删除自己的 schema），或改绑到满足这一点的 dev 实例；落实后重跑本阶段",
+          "recommended": true,
+          "rationale": "不改变已批准的设计与产品行为，测试仍在真实 PostgreSQL 的干净 schema 上运行，不影响共享 public 中的他人数据；已写好的 InitialAdminSetupIT、IQA-016 功能测试和双实例脚本可直接验证。候选验证 Runner 以 Agent 身份执行同一套测试，也需要同样的权限。"
+        },
+        {
+          "key": "B",
+          "label": "回到 technical-solution 修订 TD-016：改用其他方式获得“尚无可用管理员”的真实起始状态（例如改用专用的第二个 dev 依赖或项目库，需重新声明并绑定）",
+          "recommended": false,
+          "rationale": "不需要库级 CREATE 权限，但需要修订 design、依赖声明并重新审批与绑定，周期更长。"
+        },
+        {
+          "key": "C",
+          "label": "接受首次设置完整流程只由单元 / 切片测试覆盖，真实实例上只验证失败即关闭等不写库的路径（需修订 design 与任务计划）",
+          "recommended": false,
+          "rationale": "最快，但真实集成证据减少，与宪章「测试与质量」及 AC-021“首次设置在空环境上的完整行为由开发阶段自动化测试覆盖”的要求存在冲突，不推荐。"
+        }
+      ],
+      "dependency": {
+        "name": "ticket-db",
+        "environment": "dev"
+      }
+    }
+  ]
+}

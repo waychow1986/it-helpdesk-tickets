@@ -1,0 +1,14 @@
+# 集成测试 profile：连接真实 ticket-db dev 实例（AIDH_DEP_TICKET_DB_*），
+# 生产 Clock 由测试配置 TestClockConfig 中的可变测试时钟（@Primary）替换。
+spring:
+  main:
+    banner-mode: "off"
+  datasource:
+    hikari:
+      maximum-pool-size: 4
+app:
+  time-zone: Asia/Shanghai
+logging:
+  level:
+    root: WARN
+    com.ithelpdesk: INFO

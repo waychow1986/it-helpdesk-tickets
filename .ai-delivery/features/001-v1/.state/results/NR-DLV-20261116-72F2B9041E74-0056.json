@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0056",
+  "stage": "specification",
+  "outcome": "passed",
+  "summary": "按人工审批意见 HT-DLV-20261116-72F2B9041E74-0016 修订规格：测试环境只有一个由业务方提供凭据的初始管理员，QA 与 UAT 共用，QA 不再自备管理员账号，员工与 IT 同事账号由该管理员通过产品功能创建；IQA-015、IQA-016 未改动。",
+  "artifacts": [
+    { "path": ".ai-delivery/features/001-v1/spec.md" }
+  ]
+}

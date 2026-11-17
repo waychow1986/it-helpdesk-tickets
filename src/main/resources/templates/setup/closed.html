@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('设置初始管理员')}"></head>
+<body>
+<header class="topbar"><span class="brand">IT 工单系统</span></header>
+<main class="narrow">
+  <h1 data-testid="setup-closed">系统已完成初始管理员设置，此入口不可用</h1>
+  <p><a th:href="@{/login}" data-testid="setup-back-to-login">返回登录</a></p>
+</main>
+</body>
+</html>

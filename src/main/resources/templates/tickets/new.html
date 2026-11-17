@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('提交工单')}"></head>
+<body>
+<header th:replace="~{layout :: nav}"></header>
+<main>
+  <h1>提交工单</h1>
+  <div th:replace="~{layout :: flash}"></div>
+  <p th:if="${#lists.isEmpty(categories)}" class="flash err" data-testid="no-category">暂无可选类别，请联系管理员</p>
+  <form th:unless="${#lists.isEmpty(categories)}" method="post" th:action="@{/tickets}" th:object="${form}" novalidate class="stack">
+    <p th:if="${errors != null and errors['categoryId'] == '所选类别已不可用'}" class="flash err" data-testid="flash">所选类别已不可用</p>
+    <label>标题
+      <input type="text" th:field="*{title}" data-testid="ticket-title">
+    </label>
+    <span th:if="${errors != null and errors['title'] != null}" class="field-error" data-testid="field-error-title" th:text="${errors['title']}"></span>
+    <label>问题描述
+      <textarea th:field="*{description}" rows="6" data-testid="ticket-description"></textarea>
+    </label>
+    <span th:if="${errors != null and errors['description'] != null}" class="field-error" data-testid="field-error-description" th:text="${errors['description']}"></span>
+    <label>类别
+      <select th:field="*{categoryId}" data-testid="ticket-category">
+        <option value="">请选择</option>
+        <option th:each="c : ${categories}" th:value="${c.id}" th:text="${c.name}">类别</option>
+      </select>
+    </label>
+    <span th:if="${errors != null and errors['categoryId'] != null}" class="field-error" data-testid="field-error-categoryId" th:text="${errors['categoryId']}"></span>
+    <label>紧急程度
+      <select th:field="*{urgency}" data-testid="ticket-urgency">
+        <option value="">请选择</option>
+        <option th:each="u : ${urgencies}" th:value="${u.name()}" th:text="${u.label}">低</option>
+      </select>
+    </label>
+    <span th:if="${errors != null and errors['urgency'] != null}" class="field-error" data-testid="field-error-urgency" th:text="${errors['urgency']}"></span>
+    <button type="submit" data-testid="ticket-submit">提交</button>
+  </form>
+</main>
+</body>
+</html>

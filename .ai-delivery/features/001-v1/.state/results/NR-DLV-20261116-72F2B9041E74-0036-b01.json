@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0036-b01",
+  "stage": "coding",
+  "outcome": "passed",
+  "summary": "按人工意见确认候选健康检查超时属于平台入口缺陷（已由 Runner 修复）。应用代码、Dockerfile 和 deployment.json 均未改动；静态检查、74 个单元测试和功能脚本语法检查在本次均通过，交给平台按原代码重新部署候选。",
+  "artifacts": [
+    { "path": ".ai-delivery/features/001-v1/reports/implementation.md" }
+  ],
+  "progress": {
+    "completedTaskIds": [],
+    "blockedTaskIds": []
+  }
+}

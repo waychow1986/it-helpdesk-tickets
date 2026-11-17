@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0065",
+  "stage": "task-planning.gate",
+  "outcome": "passed",
+  "summary": "tasks-implementation.md 完整、按测试先行排序，路径均在 design 授权清单内，并忠实推导了修订后的 design（TD-011 一次性 /setup、TD-016 一次性 schema、TD-017 public 作用域、TD-018 应用不读取 AIDH_SECRET_*、端口改读 AIDH_DEP_TICKET_DB_PORT）及 spec 的 FR-031/IQA-016/AC-021、IQA-015 口径，未发现阻塞问题。",
+  "artifacts": [],
+  "findings": []
+}

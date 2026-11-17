@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0049",
+  "stage": "technical-solution",
+  "outcome": "passed",
+  "summary": "已按 spec 新增的 FR-031/IQA-016/AC-021 与修订的 IQA-015/AC-020 增量修订 design.md：TD-011 改为登录入口一次性“设置初始管理员”流程（GET/POST /setup，以“是否存在带凭据 ADMIN”判定开放、advisory lock 串行、关闭后 403 且不读写账号，删除启动引导与运维 Runbook），新增 TD-016（开发者测试用一次性 schema 的 app.db.schema 配置）；同步修订了技术上下文、治理与技术约束（HT-0011/PQ-003、PQ-004）、字段规则、组件结构、关键流程、HTTP 路由、data-testid、数据库数据契约、安全（初始管理员、URL 授权）、配置（app.db.schema，数据库端口改读 AIDH_DEP_TICKET_DB_PORT，移除 app.bootstrap.*）、运维要点、验证环境责任矩阵（IQA-015、IQA-016）、Quickstart 与支持 Runbook；docs/dependencies.json 无需改动。",
+  "artifacts": [
+    { "path": ".ai-delivery/features/001-v1/design.md" }
+  ]
+}

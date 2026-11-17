@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0012",
+  "stage": "technical-baseline.proposal",
+  "outcome": "passed",
+  "summary": "已提出技术基线候选方案：推荐 Java 21 + Spring Boot 3 服务端渲染单体 + 平台 PostgreSQL 依赖（Entra 无密码连接、Flyway 启动迁移），并给出 SPA 与 Quarkus 两个备选方案及取舍。",
+  "artifacts": [
+    {"path": ".ai-delivery/features/001-v1/technical-baseline-proposal.json"}
+  ]
+}

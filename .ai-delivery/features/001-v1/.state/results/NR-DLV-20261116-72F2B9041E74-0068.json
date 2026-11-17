@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0068",
+  "stage": "specification",
+  "outcome": "passed",
+  "summary": "按人工审批意见 HT-DLV-20261116-72F2B9041E74-0019 仅修订 FR-031、SC-007、AC-021 与 IQA-016（情形①前置条件、操作、预期结果、证据与追踪），新增一次性设置口令要求（口令缺失或错误时拒绝且不创建账号，部署时提供口令不算手工修改数据或配置），并在 Intent 追踪矩阵补充对应人工来源行，其余内容未改动。",
+  "artifacts": [
+    {"path": ".ai-delivery/features/001-v1/spec.md"}
+  ]
+}

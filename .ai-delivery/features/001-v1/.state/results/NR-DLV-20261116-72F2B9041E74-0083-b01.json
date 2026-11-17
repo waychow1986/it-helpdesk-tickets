@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0083-b01",
+  "stage": "coding",
+  "outcome": "passed",
+  "summary": "按人工答案 DEC-CODING-001=A 保持 TD-016 重跑受阻任务：ticket-db dev 身份已可创建并删除 schema，静态检查、构建、108 个单元测试、47 个集成测试（含 InitialAdminSetupIT 8 例）与 18 项浏览器功能测试（含 IQA-016 一次性 schema 实例）在真实 dev 实例上全部通过，T021、T065、T066、T067、T068、T059 已勾选，全部任务完成。",
+  "artifacts": [
+    { "path": ".ai-delivery/features/001-v1/tasks-implementation.md" },
+    { "path": ".ai-delivery/features/001-v1/reports/implementation.md" }
+  ],
+  "progress": {
+    "completedTaskIds": ["T021", "T065", "T066", "T067", "T068", "T059"],
+    "blockedTaskIds": []
+  }
+}

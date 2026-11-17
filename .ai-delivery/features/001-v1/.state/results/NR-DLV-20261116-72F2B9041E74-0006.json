@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0006",
+  "stage": "specification",
+  "outcome": "needs_decision",
+  "summary": "已完成内部 IT 工单系统产品规格（US-001～US-010、FR-001～FR-030、AC-001～AC-020、IQA-001～IQA-015），紧急程度分级与周报表数量指标计入口径 2 个产品问题待产品负责人决定。",
+  "artifacts": [{"path": ".ai-delivery/features/001-v1/spec.md"}],
+  "decisionsNeeded": [
+    {
+      "id": "PQ-001",
+      "level": "product",
+      "question": "工单“紧急程度”有哪些级别？Intent 要求提交时填写紧急程度，但未给出分级。",
+      "affects": ["INT-007", "FR-007", "AC-006", "IQA-002"],
+      "options": [
+        {"key": "A", "label": "三级：低、中、高", "recommended": true, "rationale": "最小且常见的分级。"},
+        {"key": "B", "label": "四级：低、中、高、紧急", "recommended": false}
+      ]
+    },
+    {
+      "id": "PQ-002",
+      "level": "product",
+      "question": "INT-024 中“统计本周内提交或解决的工单”在“每个类别的工单数量”和“每个 IT 同事处理量”上如何计入？",
+      "affects": ["INT-019", "INT-024", "FR-027", "AC-017", "IQA-013"],
+      "options": [
+        {"key": "A", "label": "类别数量 = 本周内提交的工单按类别计数；IT 同事处理量 = 本周内首次被标记为已解决的工单，计入该时刻的处理人（无处理人计入“未分配”）", "recommended": true, "rationale": "每项指标只用一个时间口径，最简单清晰。"},
+        {"key": "B", "label": "类别数量 = 本周内提交或本周内首次被标记为已解决的工单（去重）按类别计数；IT 同事处理量同 A", "recommended": false},
+        {"key": "C", "label": "类别数量同 A；IT 同事处理量 = 本周内首次被标记为已解决的工单，计入执行“标记为已解决”操作的 IT 同事", "recommended": false}
+      ]
+    }
+  ]
+}

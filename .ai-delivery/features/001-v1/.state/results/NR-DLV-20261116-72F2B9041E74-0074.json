@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0074",
+  "stage": "technical-solution",
+  "outcome": "passed",
+  "summary": "按 spec 修订（FR-031、SC-007、AC-021、IQA-016 补充一次性设置口令，人工审批意见 HT-0018/HT-0019）同步技术方案：修订仓库现状说明、治理约束表 HT-0018/HT-0019 行、TD-019 追踪、数据库数据契约中 IQA-016 情形①步骤顺序、验证矩阵功能测试步骤顺序、开放决策（移除待上游修订项），并在 docs/dependencies.json 的 INITIAL_SETUP_TOKEN 用途中补充追踪编号；架构、依赖约束与其余设计不变。",
+  "artifacts": [
+    {"path": ".ai-delivery/features/001-v1/design.md"},
+    {"path": "docs/dependencies.json"}
+  ]
+}

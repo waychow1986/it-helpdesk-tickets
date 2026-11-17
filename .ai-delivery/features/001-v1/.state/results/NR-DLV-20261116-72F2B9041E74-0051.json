@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0051",
+  "stage": "technical-solution",
+  "outcome": "needs_decision",
+  "summary": "针对 TSG-050-001 修订 design.md：新增 TD-017 数据作用域（/setup 开放判定与全部业务数据只在由平台部署身份派生的 PostgreSQL schema 内生效，与共享 test 库中其他交付、候选、开发者测试及业务方 UAT 数据隔离，作用域不可由请求选择），并同步修订了技术上下文、治理约束、TD-011、TD-016、启动顺序、candidate-identity 契约（新增 dataSchema）、数据库数据契约（删除“执行环境状态问题”的归类，写明 IQA-016 前置状态如何获得）、配置、迁移策略、验证矩阵（单元/集成/IQA-015/IQA-016）、Runbook 与开放决策；作用域粒度会决定 IQA-015 与 IQA-016 能否在共享库上同时独立成立，且 QD-001 的答案不在仓库中，因此交由人决定（DEC-TS-001）；docs/dependencies.json 未改动。",
+  "artifacts": [
+    { "path": ".ai-delivery/features/001-v1/design.md" }
+  ],
+  "decisionsNeeded": [
+    {
+      "id": "DEC-TS-001",
+      "level": "product",
+      "question": "共享 test 库中，“设置初始管理员”（FR-031）的开放判定和业务数据应按什么范围隔离？范围同时决定什么算“新部署的环境”（IQA-016 前置条件）、什么算“同一份数据的升级/重新部署”（IQA-015、FR-030）。若沿用整库判定，业务方按 SC-007 完成设置后，后续所有候选都无法验证 IQA-016。另外 QD-001 的答案原文不在交付仓库中，无法判断 IQA-015 是要求重新部署同一候选，还是在同一份数据上部署新候选版本。",
+      "affects": ["FR-031", "FR-030", "SC-007", "IQA-015", "IQA-016", "TD-017"],
+      "options": [
+        { "key": "A", "label": "每个候选版本一个数据作用域（schema cand_<delivery>_<sha12>）：每个新候选（含 bugfix/convergence 产生的候选）都是新环境，可以独立、重复地验证 IQA-016；IQA-015 只能以“重新部署同一候选版本”的方式执行；业务方在每个新候选上都要重新设置验收数据", "recommended": true, "rationale": "能完整保住 IQA-016 的独立可执行性和每个作用域内 FR-031 的永久关闭，不需要平台变更，也不修改 spec。前提是 QD-001 的执行方式是重新部署同一版本，并且正式发布不按候选 SHA 切换作用域" },
+        { "key": "B", "label": "每个交付一个数据作用域（schema dlv_<delivery>）：同一交付的候选之间升级时数据保留，IQA-015 两种执行方式都可行；但业务方 UAT 设置之后，后续候选无法再满足 IQA-016 的前置条件，需要回退 specification 调整 IQA-016", "recommended": false },
+        { "key": "C", "label": "保持整库判定，由平台/运维为每个候选的 test 环境提供独立数据库实例", "recommended": false, "rationale": "平台目前不提供，需要平台变更" },
+        { "key": "D", "label": "保持整库判定，回退 specification 调整 IQA-016 的前置条件（例如允许在已完成设置的环境中只验证关闭行为）", "recommended": false }
+      ]
+    }
+  ]
+}

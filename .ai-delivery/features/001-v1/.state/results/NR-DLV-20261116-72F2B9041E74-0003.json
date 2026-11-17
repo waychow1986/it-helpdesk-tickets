@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0003",
+  "stage": "intent",
+  "outcome": "passed",
+  "summary": "已按人工澄清答案（BQ-001 自建账号由管理员创建、三种身份、IT主管报表权限归管理员；BQ-002/BQ-003 选 A）更新 intent.md，当前无阻塞业务问题。",
+  "artifacts": [{"path": ".ai-delivery/features/001-v1/intent.md"}]
+}

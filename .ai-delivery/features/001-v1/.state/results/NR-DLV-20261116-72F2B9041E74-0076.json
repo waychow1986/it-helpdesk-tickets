@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0076",
+  "stage": "task-planning",
+  "outcome": "passed",
+  "summary": "按 design 新增 TD-019（一次性设置口令与失败限流）及 FR-031、AC-021、IQA-016 修订增量更新实施任务：修订 T004、T014、T021、T059、T062、T064、T065、T066、T067 与任务说明、依赖关系、完成证据和延后平台证据（INITIAL_SETUP_TOKEN），新增测试先行任务 T069（SetupTokenVerifierTest）、T070（SetupAttemptLimiterTest）与实现任务 T071（SetupTokenVerifier、SetupAttemptLimiter），其余任务未改动。",
+  "artifacts": [
+    { "path": ".ai-delivery/features/001-v1/tasks-implementation.md" }
+  ]
+}

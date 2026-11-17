@@ -1,0 +1,52 @@
+{
+  "schemaVersion": 2,
+  "dependencies": [
+    {
+      "name": "ticket-db",
+      "kind": "postgres",
+      "purpose": "工单系统唯一的持久化存储：账号与身份、工单类别、工单、沟通记录、处理记录（含首次已解决时刻）；应用启动时以 Flyway 执行只增不删的版本化迁移，支撑长期保存与升级/重新部署后数据不丢失（INT-020、FR-029、FR-030、NFR-001）。",
+      "preferences": {
+        "version": ">=16"
+      },
+      "secret": false,
+      "realInstance": {
+        "dev": true,
+        "test": true
+      }
+    }
+  ],
+  "secrets": [
+    {
+      "name": "INITIAL_ADMIN_LOGIN_NAME",
+      "purpose": "测试环境唯一初始管理员的登录名，由业务方提供，供 Independent QA 在 IQA-016 情形①经“设置初始管理员”流程填写、情形②及其他场景登录使用（人工审批意见 HT-DLV-20261116-72F2B9041E74-0016）；应用不读取。",
+      "environments": [
+        "test"
+      ],
+      "required": true
+    },
+    {
+      "name": "INITIAL_ADMIN_PASSWORD",
+      "purpose": "测试环境唯一初始管理员的登录凭据（密码），由业务方提供，QA 与 UAT 共用；应用不读取，不得出现在证据明文中。",
+      "environments": [
+        "test"
+      ],
+      "required": true
+    },
+    {
+      "name": "INITIAL_ADMIN_DISPLAY_NAME",
+      "purpose": "测试环境唯一初始管理员的姓名，由业务方提供，供 IQA-016 情形①设置流程填写；应用不读取。",
+      "environments": [
+        "test"
+      ],
+      "required": true
+    },
+    {
+      "name": "INITIAL_SETUP_TOKEN",
+      "purpose": "测试环境部署的一次性设置口令（TD-019，人工审批意见 HT-DLV-20261116-72F2B9041E74-0018、HT-DLV-20261116-72F2B9041E74-0019，spec FR-031）：应用读取后只以摘要保存，“设置初始管理员”流程只接受携带该口令的提交，防止部署后被他人抢先设置管理员；Independent QA 在 IQA-016 情形①中用它完成首次设置。应用要求不少于 16 个字符；不得出现在日志、截图或证据明文中。",
+      "environments": [
+        "test"
+      ],
+      "required": true
+    }
+  ]
+}

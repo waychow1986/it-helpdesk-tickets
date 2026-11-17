@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0008",
+  "stage": "specification.gate",
+  "outcome": "passed",
+  "summary": "spec.md 完整、内部一致且技术无关，US/FR/NFR/AC/IQA 均有 direct、closure、governance 或人工 clarification 来源，忠实覆盖 INT-001～INT-024 并准确吸收 BQ-001～BQ-003 与 PQ-001、PQ-002 人工答案，AC-001～AC-020 均由可判定通过或失败的 IQA-001～IQA-015 覆盖，无未决产品问题，评审通过。",
+  "artifacts": [],
+  "findings": []
+}

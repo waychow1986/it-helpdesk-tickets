@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0062",
+  "stage": "technical-solution",
+  "outcome": "passed",
+  "summary": "按 spec 修订（IQA-001、IQA-015、IQA-016、AC-020、AC-021、测试策略与人工审批意见 HT-0016）增量修订技术方案：新增 TD-018 以 test 环境应用机密 INITIAL_ADMIN_LOGIN_NAME/PASSWORD/DISPLAY_NAME 向 Independent QA 交付业务方提供的初始管理员凭据（应用不读取）；修订技术上下文、治理与技术约束（新增 HT-0016 行，更新 HT-0014/QD-001 行）、数据库数据契约（删除 QA 管理员种子，QA 账号经页面创建、不以 SQL 写账号，IQA-016 情形①/②使用机密凭据）、安全与 Secret、配置说明、验证环境责任矩阵（QA 范围改为 IQA-001～014、016）、支持 Runbook（新增机密凭据无法登录的处置）与开放决策；docs/dependencies.json 新增顶层 secrets，依赖约束未改动。",
+  "artifacts": [
+    {"path": ".ai-delivery/features/001-v1/design.md"},
+    {"path": "docs/dependencies.json"}
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0044",
+  "stage": "specification",
+  "outcome": "needs_decision",
+  "summary": "已按人工审批意见修订 spec.md：新增 FR-031、SC-007、AC-021、IQA-016（无需人工改数据或配置即可获得初始管理员凭据并登录）；修订了前置条件、参与者与权限、US-001 行为、错误与恢复、凭据安全行为、IQA-015（必须实际发生升级或重新部署，执行方式按 QD-001）、AC-020、追踪矩阵、测试策略与通过标准、依赖；QD-001 答案原文不在仓库中，且初始凭据的获得方式需要人工决定，因此提出 PQ-003、PQ-004。",
+  "artifacts": [
+    { "path": ".ai-delivery/features/001-v1/spec.md" }
+  ],
+  "decisionsNeeded": [
+    {
+      "id": "PQ-003",
+      "level": "product",
+      "question": "业务方以何种方式获得初始管理员凭据？（人工已确定：不得依赖任何人手工修改数据库或配置）",
+      "affects": ["INT-021", "FR-031", "AC-021", "IQA-016"],
+      "options": [
+        { "key": "A", "label": "首次初始化入口：系统尚无可登录管理员时，在登录入口提供一次性“设置初始管理员”流程，由业务方设置凭据；设置完成后该入口永久不可用", "recommended": true, "rationale": "完全在产品内完成，可在新部署的候选环境中以黑盒方式验收，不依赖系统外的交付渠道" },
+        { "key": "B", "label": "系统在首次投入使用时生成初始管理员凭据，通过系统之外的受控渠道交付给业务方指定的管理员；页面不新增入口", "recommended": false, "rationale": "不新增页面，但需要另行约定交付渠道" }
+      ]
+    },
+    {
+      "id": "PQ-004",
+      "level": "product",
+      "question": "IQA-015 需要按 QD-001 的答案修订，但 QD-001 的答案原文不在交付仓库中，本阶段无法读取。请确认 IQA-015 的执行方式。",
+      "affects": ["INT-006", "INT-020", "FR-030", "AC-020", "IQA-015"],
+      "options": [
+        { "key": "A", "label": "同一候选环境内，QA 写入数据并记录快照后，由平台对同一候选版本执行一次重新部署，再核对", "recommended": true, "rationale": "与原规格一致，范围最小" },
+        { "key": "B", "label": "升级方式：QA 先在一个已部署版本上写入数据并记录快照，再在同一份已保存数据上部署新的候选版本，然后核对", "recommended": false },
+        { "key": "C", "label": "其他方式（请写明 QD-001 的答案原文）", "recommended": false }
+      ]
+    }
+  ]
+}

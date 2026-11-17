@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0002",
+  "stage": "intent",
+  "outcome": "needs_decision",
+  "summary": "已依据 request.json 完成内部 IT 工单系统业务意图（INT-001～INT-020），身份识别方式与周报表口径等 3 个高影响业务问题待业务方决定。",
+  "artifacts": [
+    {"path": ".ai-delivery/features/001-v1/intent.md"}
+  ],
+  "decisionsNeeded": [
+    {
+      "id": "BQ-001",
+      "level": "business",
+      "question": "员工、IT 同事、管理员和 IT 主管如何登录并被识别身份？",
+      "affects": ["INT-001", "INT-010", "INT-016"],
+      "options": [
+        {"key": "A", "label": "使用公司现有统一账号登录（如企业目录 / SSO），员工无需另行注册", "recommended": true, "rationale": "员工身份可靠，便于保证员工只能看到自己的工单，也便于管理员从现有人员中设置 IT 同事。"},
+        {"key": "B", "label": "系统内自建账号，由管理员创建或员工自行注册", "recommended": false},
+        {"key": "C", "label": "系统内自建账号，由管理员统一创建，不开放自助注册", "recommended": false}
+      ]
+    },
+    {
+      "id": "BQ-002",
+      "level": "business",
+      "question": "报表中“超过 3 天没解决”的 3 天如何计算、“没解决”指哪些状态？",
+      "affects": ["INT-019"],
+      "options": [
+        {"key": "A", "label": "按自然日计算（自提交起超过 72 小时），状态为待处理或处理中的工单计为未解决", "recommended": true, "rationale": "口径最简单直观，无需维护工作日历。"},
+        {"key": "B", "label": "按工作日计算（扣除周末与节假日），状态为待处理或处理中的工单计为未解决", "recommended": false}
+      ]
+    },
+    {
+      "id": "BQ-003",
+      "level": "business",
+      "question": "每周报表的统计范围和“平均处理时长”的口径是什么？",
+      "affects": ["INT-019"],
+      "options": [
+        {"key": "A", "label": "统计本周（自然周）内提交或解决的工单；平均处理时长按提交到首次标记为已解决计算；积压数为查看时点的实时数量", "recommended": true, "rationale": "符合每周看报表的使用方式，口径清晰。"},
+        {"key": "B", "label": "报表可由 IT 主管自选任意时间范围，口径同 A", "recommended": false},
+        {"key": "C", "label": "统计全部历史工单（累计口径），平均处理时长按提交到已关闭计算", "recommended": false}
+      ]
+    }
+  ]
+}

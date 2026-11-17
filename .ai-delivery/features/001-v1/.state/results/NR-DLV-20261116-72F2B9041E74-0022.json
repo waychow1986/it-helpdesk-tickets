@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0022",
+  "stage": "task-planning.gate",
+  "outcome": "passed",
+  "summary": "复检通过：TPG-001 已通过在「依赖关系」与「完成证据」中补齐 IQA-008/IQA-002/IQA-004 的跨故事前置依赖并扩充 T059 依赖解决；TPG-002 已通过新增 T060（TicketNewPageTest 切片测试，路径在 design 清单内）并从 T036 移除不可执行的无有效类别 e2e 步骤、T037 依赖 T060 解决；本轮改动未引入新的阻塞问题。",
+  "artifacts": [],
+  "findings": []
+}

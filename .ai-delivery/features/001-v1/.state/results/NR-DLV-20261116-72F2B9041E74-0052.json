@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0052",
+  "stage": "technical-solution",
+  "outcome": "upstream_exception",
+  "summary": "已按人工答案 DEC-TS-001=D 修订 design.md（TD-017 改为以应用所连数据库为数据作用域、删除部署身份派生 schema 与 dataSchema、首次设置完整流程由开发者测试在一次性 schema 覆盖、改写验证矩阵与数据契约、关闭 DEC-TS-001）；IQA-016 与 IQA-015 的验收口径需按该人工答案回退 specification 修订。",
+  "artifacts": [
+    { "path": ".ai-delivery/features/001-v1/design.md" }
+  ],
+  "upstream": {
+    "targetNodeId": "specification",
+    "reasonType": "infeasible",
+    "evidence": "门禁 TSG-050-001：共享 test 库中任一非 QA 的初始管理员设置会使整库判定下的 /setup 对后续候选永久关闭，spec IQA-016“新部署、尚未设置初始管理员的环境”前置条件在候选环境中无法独立获得。人工澄清答案 HT-DLV-20261116-72F2B9041E74-0014 选定 DEC-TS-001=D 并明确要求修订规格：1) IQA-016 前置条件改为：在尚无可用管理员的环境中首次部署时验证首次设置的完整流程；之后的候选验证“已有管理员时设置入口不可见，直接访问被拒，且不能新增或接管账号”；首次设置在空库上的完整行为由开发阶段自动化测试覆盖（同步修订 AC-021 相关表述及测试策略中“IQA-016 需要一个新部署、尚未设置初始管理员的环境”“其他场景所需的管理员账号由该初始管理员在系统内创建”两句，已有管理员时其他场景管理员的来源需相应调整）。2) IQA-015：在规格中直接写明“V1 不验证升级或重新部署后的数据保留，改到后续迭代通过真实升级来验证”，不转引 QD-001（同步修订 AC-020、测试策略中 IQA-015 条目与通过标准 IQA-001～IQA-016 全部通过的表述）。design.md 已按修订后口径编写（TD-017、数据库数据契约、验证环境责任矩阵、开放决策）。",
+    "changesApprovedIntent": false
+  }
+}

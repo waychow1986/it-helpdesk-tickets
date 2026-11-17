@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('账号管理')}"></head>
+<body>
+<header th:replace="~{layout :: nav}"></header>
+<main>
+  <h1>账号管理</h1>
+  <div th:replace="~{layout :: flash}"></div>
+  <h2>创建账号</h2>
+  <form method="post" th:action="@{/admin/users}" th:object="${form}" novalidate class="stack">
+    <label>登录名 <input type="text" th:field="*{loginName}" data-testid="user-login" autocomplete="off"></label>
+    <span th:if="${errors != null and errors['loginName'] != null}" class="field-error" data-testid="field-error-loginName" th:text="${errors['loginName']}"></span>
+    <label>初始密码 <input type="password" name="password" value="" data-testid="user-password" autocomplete="new-password"></label>
+    <span th:if="${errors != null and errors['password'] != null}" class="field-error" data-testid="field-error-password" th:text="${errors['password']}"></span>
+    <label>显示姓名 <input type="text" th:field="*{displayName}" data-testid="user-display"></label>
+    <span th:if="${errors != null and errors['displayName'] != null}" class="field-error" data-testid="field-error-displayName" th:text="${errors['displayName']}"></span>
+    <label>身份
+      <select th:field="*{role}" data-testid="user-role">
+        <option value="">请选择</option>
+        <option th:each="r : ${roles}" th:value="${r.name()}" th:text="${r.label}">员工</option>
+      </select>
+    </label>
+    <span th:if="${errors != null and errors['role'] != null}" class="field-error" data-testid="field-error-role" th:text="${errors['role']}"></span>
+    <button type="submit" data-testid="user-create">创建账号</button>
+  </form>
+  <h2>账号列表</h2>
+  <table class="grid">
+    <thead><tr><th>登录名</th><th>显示姓名</th><th>身份</th><th>创建时间</th><th>设置身份</th></tr></thead>
+    <tbody>
+    <tr th:each="u : ${users}" data-testid="user-row" th:attr="data-login-name=${u.loginName()},data-user-id=${u.id()}">
+      <td data-testid="user-row-login" th:text="${u.loginName()}">登录名</td>
+      <td data-testid="user-row-display" th:text="${u.displayName()}">姓名</td>
+      <td data-testid="user-row-role" th:text="${u.role().label}">员工</td>
+      <td th:text="${@timeFormat.format(u.createdAt())}">时间</td>
+      <td>
+        <form th:if="${u.role().name() != 'ADMIN'}" method="post" th:action="@{/admin/users/{id}/role(id=${u.id()})}" class="inline">
+          <select name="role" data-testid="role-select">
+            <option value="EMPLOYEE" th:selected="${u.role().name() == 'EMPLOYEE'}">员工</option>
+            <option value="IT_STAFF" th:selected="${u.role().name() == 'IT_STAFF'}">IT 同事</option>
+          </select>
+          <button type="submit" data-testid="role-submit">保存身份</button>
+        </form>
+      </td>
+    </tr>
+    </tbody>
+  </table>
+</main>
+</body>
+</html>

@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0058",
+  "stage": "specification",
+  "outcome": "passed",
+  "summary": "已修订 IQA-016 情形①②改用业务方人工提供的初始管理员凭据完成设置与登录核对，并在 IQA-001、IQA-016 追踪中补充人工审批意见 HT-DLV-20261116-72F2B9041E74-0016。",
+  "artifacts": [{"path": ".ai-delivery/features/001-v1/spec.md"}]
+}

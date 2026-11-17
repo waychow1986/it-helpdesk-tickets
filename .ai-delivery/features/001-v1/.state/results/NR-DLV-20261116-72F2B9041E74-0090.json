@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0090",
+  "stage": "qa.plan",
+  "outcome": "passed",
+  "summary": "人工已对 QA-DEC-001 选择 A，test 环境的 INITIAL_SETUP_TOKEN 已更正，QA 计划无需修改，保持上一版 tasks-qa.md 与 runtime/qa-run.sh 并锁定：spec 中 16 个 IQA 场景各有一个清单项，脚本 bash -n 通过。QA Pod 中注入的口令现在不少于 16 个字符。对已部署候选 81bbea0 试运行时，健康检查和身份校验都通过，但候选尚未用新口令重新部署，设置页仍显示 setup-token-missing。脚本没有提交任何设置请求，按执行环境问题判定（defects、testGaps 均为空），证据中没有机密明文。候选按平台机制重新部署后即可执行锁定的计划。",
+  "artifacts": []
+}

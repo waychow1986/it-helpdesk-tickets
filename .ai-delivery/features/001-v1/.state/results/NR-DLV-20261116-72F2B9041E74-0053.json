@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0053",
+  "stage": "specification",
+  "outcome": "passed",
+  "summary": "已按人工澄清答案 HT-DLV-20261116-72F2B9041E74-0014（DEC-TS-001=D）与审批 HT-0015 只修订 IQA-016（分首次设置/已有管理员两种情形）、IQA-015（V1 不验证，改到后续迭代通过真实升级验证）、AC-020、AC-021、测试策略（开发者验证、Independent QA 验收、总体通过标准）、IQA-001 前置条件中管理员来源引用及追踪矩阵新增 HT-0014 行，其他内容未改动。",
+  "artifacts": [
+    {"path": ".ai-delivery/features/001-v1/spec.md"}
+  ]
+}

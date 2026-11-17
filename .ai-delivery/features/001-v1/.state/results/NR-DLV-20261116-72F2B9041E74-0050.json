@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0050",
+  "stage": "technical-solution.gate",
+  "outcome": "repair",
+  "summary": "design.md 本轮修订（TD-011 一次性设置初始管理员、TD-016、路由、配置、验证矩阵、Runbook）整体忠实于 FR-031/AC-021/IQA-016 与 PQ-004 C，但 /setup 开放判定覆盖整个共享 test 库，与平台“库由多个交付与候选共享、不得假设库为空”的约束冲突，IQA-016 在 Independent QA 中无法可靠复现，需修订。",
+  "artifacts": [],
+  "findings": [
+    {
+      "id": "TSG-050-001",
+      "severity": "high",
+      "owner": "technical-solution",
+      "route": "current_stage",
+      "summary": "TD-011 以“`public` schema 中是否存在任一带凭据 ADMIN”判定 /setup 是否开放，而已批准技术基线明确 `test` 库由多个交付与候选共享、测试不得假设库为空。按本设计，任何一次非 QA 前缀的初始管理员设置（例如业务方按 SC-007 在候选环境中完成设置、其他交付或其他候选的验收数据）都会使共享 `test` 库中的 /setup 对之后所有候选永久关闭，后续候选（含 bugfix/convergence 后的新候选）及并行 QA 运行都无法满足 IQA-016“新部署、尚未设置初始管理员的环境”的前置条件。design.md「数据库数据契约」把这种可预见、由正常业务流程必然产生的状态归为“执行环境状态问题”，等于让 IQA-016 的可执行性依赖库为空的假设，验证责任划分不可行。",
+      "recommendation": "在 design.md 中给出在共享 `test` 库上仍可让每个候选的 Independent QA 独立、可重复地验证 IQA-016 的技术方案，并同时保持 IQA-015（同一份已保存数据经升级/重新部署后保留）与 FR-031“设置成功后永久不可用”；明确判定范围（作用域）、它与共享库中其他交付/候选/业务方 UAT 数据的关系，以及 QA 的前置状态如何获得（不得要求任何人手工改库或改配置，也不得为产品增加测试后门）。若在已批准权限内无法找到不改变 FR-031 产品语义的方案，按规则以 `decisionsNeeded` 列出可选方案（例如按部署作用域隔离初始化状态、为 test 环境提供独立数据库实例、调整 IQA-016 前置条件）交由人决定，而不是把该状态记为环境问题。"
+    }
+  ]
+}
