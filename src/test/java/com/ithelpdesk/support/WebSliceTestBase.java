@@ -9,7 +9,10 @@ import com.ithelpdesk.report.WeeklyReportService;
 import com.ithelpdesk.ticket.TicketCommandService;
 import com.ithelpdesk.ticket.TicketQueryService;
 import com.ithelpdesk.user.AppUser;
+import com.ithelpdesk.user.InitialAdminSetupService;
 import com.ithelpdesk.user.Role;
+import com.ithelpdesk.user.SetupAttemptLimiter;
+import com.ithelpdesk.user.SetupTokenVerifier;
 import com.ithelpdesk.user.UserAdminService;
 import com.ithelpdesk.user.UserRepository;
 import java.time.Instant;
@@ -44,6 +47,15 @@ public abstract class WebSliceTestBase {
 
     @MockitoBean
     protected WeeklyReportService weeklyReportService;
+
+    @MockitoBean
+    protected InitialAdminSetupService initialAdminSetupService;
+
+    @MockitoBean
+    protected SetupTokenVerifier setupTokenVerifier;
+
+    @MockitoBean
+    protected SetupAttemptLimiter setupAttemptLimiter;
 
     protected CurrentUser employee = new CurrentUser(101, "e1", "员工甲", Role.EMPLOYEE, "x");
     protected CurrentUser staff = new CurrentUser(201, "t1", "IT 甲", Role.IT_STAFF, "x");

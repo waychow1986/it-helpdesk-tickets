@@ -40,6 +40,23 @@ class SecurityConfigTest extends WebSliceTestBase {
             .andExpect(content().string(not(containsString("注册"))));
         mvc.perform(get("/api/candidate-identity")).andExpect(status().isOk());
         mvc.perform(get("/css/app.css")).andExpect(status().isOk());
+        when(initialAdminSetupService.isSetupOpen()).thenReturn(false);
+        mvc.perform(get("/setup")).andExpect(status().isForbidden())
+            .andExpect(content().string(containsString("data-testid=\"setup-closed\"")));
+        mvc.perform(post("/setup").with(csrf()).param("setupToken", "x"))
+            .andExpect(status().isForbidden())
+            .andExpect(content().string(containsString("data-testid=\"setup-closed\"")));
+        // 平台 healthPath 匿名可达：切片中无 Actuator，结果不应是重定向到登录页
+        int health = mvc.perform(get("/actuator/health")).andReturn().getResponse().getStatus();
+        org.assertj.core.api.Assertions.assertThat(health).isNotEqualTo(302);
+    }
+
+    @Test
+    void setupPostWithoutCsrfIsForbidden() throws Exception {
+        when(initialAdminSetupService.isSetupOpen()).thenReturn(true);
+        mvc.perform(post("/setup").param("setupToken", "x").param("loginName", "y"))
+            .andExpect(status().isForbidden())
+            .andExpect(content().string(not(containsString("setup-closed"))));
     }
 
     @Test

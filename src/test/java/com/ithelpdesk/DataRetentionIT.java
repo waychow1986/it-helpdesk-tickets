@@ -22,11 +22,13 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.WebApplicationType;
 import org.springframework.boot.builder.SpringApplicationBuilder;
 import org.springframework.context.ConfigurableApplicationContext;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.core.Authentication;
@@ -34,7 +36,8 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 /**
  * 数据保留（FR-029、FR-030、NFR-001、INV-008；IQA-015 的开发者侧对应验证）：
- * 在真实 dev 实例上写入数据后，启动一个全新的应用上下文（再次执行 Flyway 与启动引导），快照与报表完全一致。
+ * 在真实 dev 实例上写入数据后，启动一个全新的应用上下文（再次执行 Flyway；启动不写入任何账号或业务数据），
+ * 快照、报表与 app_user 行数完全一致，账号仍可按原身份认证。V1 Independent QA 不执行 IQA-015，本测试为开发者侧辅助证据。
  */
 class DataRetentionIT extends IntegrationTestBase {
 
@@ -82,6 +85,7 @@ class DataRetentionIT extends IntegrationTestBase {
         List<TicketDetail> before = ids.stream().map(id -> queries.detail(emp, id)).toList();
         WeeklyReport reportBefore = reports.currentWeek(admin);
         Category categoryBefore = categories.findById(cat).orElseThrow();
+        long usersBefore = countUsers(jdbc);
 
         ConfigurableApplicationContext restarted = new SpringApplicationBuilder(HelpdeskApplication.class,
             TestClockConfig.class).web(WebApplicationType.NONE).profiles("it").run();
@@ -97,6 +101,7 @@ class DataRetentionIT extends IntegrationTestBase {
             });
             assertThat(restarted.getBean(WeeklyReportService.class).currentWeek(admin)).isEqualTo(reportBefore);
             assertThat(restarted.getBean(CategoryRepository.class).findById(cat)).contains(categoryBefore);
+            assertThat(countUsers(restarted.getBean(NamedParameterJdbcTemplate.class))).isEqualTo(usersBefore);
 
             DaoAuthenticationProvider provider = new DaoAuthenticationProvider(
                 restarted.getBean(AppUserDetailsService.class));
@@ -110,5 +115,9 @@ class DataRetentionIT extends IntegrationTestBase {
         } finally {
             restarted.close();
         }
+    }
+
+    private static long countUsers(NamedParameterJdbcTemplate template) {
+        return template.queryForObject("SELECT COUNT(*) FROM app_user", Map.of(), Long.class);
     }
 }

@@ -344,3 +344,106 @@
 ### 实施结论
 
 完成：T001～T060 都已完成，本次没有修改代码。静态检查、74 个单元测试和功能脚本语法检查在本次都实际通过。候选健康检查超时经人工确认是平台入口缺陷，Runner 已修复。现提交 `passed`，交给平台按原代码重新部署。本次不声称候选环境已通过，相关证据要等平台重新部署后产生。
+
+## Coding Session NR-DLV-20261116-72F2B9041E74-0082-b01
+
+### 实施范围
+
+- 模式：`coding`，第 1 批。收到 upstream-change 反馈（基线 `5a1df2f96dd6` 之后 `spec.md`、`design.md`、`tasks-implementation.md`、`reports/convergence.md`、`docs/dependencies.json` 有修订）。本次以现有实现为基础，只修订受影响的部分。
+- 受影响条目：FR-031、AC-021、IQA-016（一次性“设置初始管理员”流程与一次性设置口令）；TD-011（启动引导改为登录入口的 `/setup` 流程）、TD-016（开发者测试使用一次性 schema）、TD-017（数据作用域 = 所连数据库的 `public` schema）、TD-018（`INITIAL_ADMIN_*` 只给 QA 使用，应用不读取）、TD-019（设置口令 + 失败限流）；数据库端口改为从 `AIDH_DEP_TICKET_DB_PORT` 读取。
+- 本次处理的未勾选任务：T004、T009、T010、T011、T014、T018、T020、T021、T058、T059、T061、T062、T063、T064、T065、T066、T067、T068、T069、T070、T071。其余已勾选任务（T001～T003、T005～T008、T012、T013、T015～T017、T019、T022～T057、T060）与修订后的 design 一致，没有改动。
+
+### 完成与受阻任务
+
+- 已完成（本次由 `[ ]` 改为 `[x]`，与结果文件 `progress.completedTaskIds` 一致）：T004、T009、T010、T011、T014、T018、T020、T058、T061、T062、T063、T064、T069、T070、T071。
+- 受阻任务（保持未勾选，与 `progress.blockedTaskIds` 一致）：T065、T066、T021、T067、T068、T059。
+  - 根因：T065 要求先确认当前身份能在 `ticket-db` `dev` 实例创建并删除一次性 schema（TD-016 前置条件），被拒绝时停止本任务，以 `decisionsNeeded`（`dependency.name=ticket-db`）提出，不改用替身。本次实测 `CREATE SCHEMA` 返回 `ERROR: permission denied for database db_9d4275ee58c5_dev`（SQLSTATE 42501）。只读查询显示：`has_database_privilege(current_user, current_database(), 'CREATE')` 为 false，`has_schema_privilege(current_user, 'public', 'CREATE')` 为 true，`public` schema 属于 `azure_pg_admin`。也就是说，当前身份只能在 `public` 中建对象，不能新建 schema。
+  - T065（`InitialAdminSetupIT`）、T066（`iqa-016-initial-admin.spec.ts`）：代码已写好，但前置条件不满足，无法在真实实例上通过，因此不勾选。`InitialAdminSetupIT` 在 `@BeforeAll` 中先做 schema 创建探测，被拒绝时以明确原因失败，不跳过，也不改用替身。
+  - T021（`developer-functional-run.sh`）：已改为双实例流程。实际执行时 8080 实例就绪，8081 实例因 Flyway `Unable to create schema "e2e_setup_…"`（同一权限错误）启动失败，脚本以非零状态退出，并按前缀完成清理。
+  - T067、T068：生产代码已实现，单元 / 切片测试通过，但它们在任务计划中依赖 T065、T066 的真实集成与功能测试，因此不勾选。
+  - T059：依赖 T021、T067、T068，目前 `integrationTests` 与 `functionalTests` 两类命令不能全部通过。
+- 需要的决定：见结果文件 `decisionsNeeded`（DEC-CODING-001，`dependency`：`ticket-db` / `dev`）。
+
+### 变更文件
+
+| 路径 | 变更 | 来源任务 |
+|---|---|---|
+| `src/main/resources/application.yml` | JDBC URL 端口改读 `AIDH_DEP_TICKET_DB_PORT`，增加 `currentSchema=${app.db.schema}`；Flyway `schemas` / `default-schema` 设为 `${app.db.schema}`；新增 `app.db.schema: public`、`app.setup.token: ${AIDH_SECRET_INITIAL_SETUP_TOKEN:}`；删除 `app.bootstrap.*` | T004 |
+| `src/main/java/com/ithelpdesk/config/AppProperties.java` | 新增 `db.schema`（默认 `public`，按 `^[a-z][a-z0-9_]{0,62}$` 校验，不合法时启动失败）与 `setup.token`（默认空，`toString` 不输出值） | T014 |
+| `src/main/java/com/ithelpdesk/user/InitialAdminBootstrap.java`、`src/main/java/com/ithelpdesk/user/BootstrapProperties.java` | 删除（启动阶段不再写入任何账号） | T018 |
+| `src/main/java/com/ithelpdesk/user/UserRepository.java` | 删除引导方法；新增 `acquireSetupLock`（`pg_advisory_xact_lock(7243011)`）、`existsCredentialedAdmin`、`insertInitialAdmin` | T067 |
+| `src/main/java/com/ithelpdesk/user/SetupTokenVerifier.java`、`src/main/java/com/ithelpdesk/user/SetupAttemptLimiter.java` | 新增：只保存口令的 SHA-256 摘要，以常量时间比较；按来源地址做 15 分钟 / 5 次失败限流，最多保存 10000 个地址 | T071 |
+| `src/main/java/com/ithelpdesk/user/SetupForm.java`、`src/main/java/com/ithelpdesk/user/SetupClosedException.java`、`src/main/java/com/ithelpdesk/user/InitialAdminSetupService.java`、`src/main/java/com/ithelpdesk/user/InitialAdminSetupController.java` | 新增：`/setup` 流程，判定顺序为 关闭 → 403、限流 → 429、口令失败 → 200、通过后进入事务，在锁内再次判定并做校验、唯一检查后 INSERT | T067（未勾选，见受阻） |
+| `src/main/resources/templates/setup/form.html`、`src/main/resources/templates/setup/closed.html` | 新增设置表单与关闭页（按 `data-testid` 约定） | T067（未勾选） |
+| `src/main/java/com/ithelpdesk/config/SecurityConfig.java`、`src/main/java/com/ithelpdesk/auth/LoginController.java`、`src/main/resources/templates/login.html` | `/setup` 匿名可达（CSRF 保持开启）；登录页仅在开放时显示 `setup-link`，`?setup` 时显示 `setup-success` | T068（未勾选） |
+| `src/test/java/com/ithelpdesk/user/InitialAdminBootstrapTest.java`、`src/test/java/com/ithelpdesk/user/InitialAdminBootstrapIT.java` | 删除 | T009、T010 |
+| `src/test/java/com/ithelpdesk/auth/LegacyAdminLoginIT.java` | 新增：NULL 哈希 ADMIN 用任意密码登录都失败，且表现与凭据错误相同；`ck_app_user_password` 拒绝 NULL 哈希的非 ADMIN 行 | T010 |
+| `src/test/java/com/ithelpdesk/auth/SecurityConfigTest.java`、`src/test/java/com/ithelpdesk/support/WebSliceTestBase.java` | 增加 `/setup` 匿名可达、缺少 CSRF 返回 403、health 不重定向；切片基类增加设置服务、口令校验、限流的替身 | T011 |
+| `src/test/java/com/ithelpdesk/config/AppPropertiesTest.java`、`src/test/java/com/ithelpdesk/SecretUsagePolicyTest.java` | 新增配置与机密使用策略测试 | T062 |
+| `src/test/java/com/ithelpdesk/user/InitialAdminSetupServiceTest.java`、`src/test/java/com/ithelpdesk/user/InitialAdminSetupControllerTest.java`、`src/test/java/com/ithelpdesk/user/SetupTokenVerifierTest.java`、`src/test/java/com/ithelpdesk/user/SetupAttemptLimiterTest.java` | 新增单元 / 切片测试 | T063、T064、T069、T070 |
+| `src/test/java/com/ithelpdesk/user/InitialAdminSetupIT.java` | 新增（一次性 schema 集成测试，含前置探测） | T065（受阻） |
+| `src/test/java/com/ithelpdesk/DataRetentionIT.java` | 重启上下文前后 `app_user` 行数不变；删除“启动引导”表述 | T058 |
+| `e2e/playwright.config.ts` | 新增 `initial-admin` project（8081，只匹配 IQA-016）与 `initial-admin-cleanup`；`chromium` 排除该文件；由运行前缀派生 `E2E_SETUP_SCHEMA` | T061 |
+| `e2e/support/db.ts`、`e2e/support/schema.ts`、`e2e/support/schema.teardown.ts` | 端口改读 `AIDH_DEP_TICKET_DB_PORT`；一次性 schema 名称校验、计数与 `DROP SCHEMA IF EXISTS … CASCADE` | T020 |
+| `e2e/tests/iqa-016-initial-admin.spec.ts` | 新增 IQA-016 情形① 开发者功能流程 | T066（受阻） |
+| `.ai-delivery/features/001-v1/runtime/developer-functional-run.sh` | 改为双实例（8080 `public` / 8081 一次性 schema + 合成口令），无论成败都清理数据并删除 schema | T021（受阻） |
+| `.ai-delivery/features/001-v1/tasks-implementation.md` | 勾选 15 项已完成任务 | — |
+| `.ai-delivery/features/001-v1/reports/implementation.md` | 末尾追加本 Session 记录 | — |
+
+### 需求与场景覆盖
+
+| 来源（FR / AC / IQA） | 实现路径 | 测试路径 | 结果 |
+|---|---|---|---|
+| FR-031 / AC-021 / IQA-016：开放判定、关闭时 403 且不读写、只建 ADMIN | `src/main/java/com/ithelpdesk/user/InitialAdminSetupService.java`、`src/main/java/com/ithelpdesk/user/InitialAdminSetupController.java` | `src/test/java/com/ithelpdesk/user/InitialAdminSetupServiceTest.java`、`src/test/java/com/ithelpdesk/user/InitialAdminSetupControllerTest.java` | 单元 / 切片测试通过（替身只用于纯逻辑）；真实实例上的首次设置完整流程受阻（T065） |
+| FR-031 / AC-021：设置口令缺失或错误时拒绝且不建账号、失败限流（TD-019） | `src/main/java/com/ithelpdesk/user/SetupTokenVerifier.java`、`src/main/java/com/ithelpdesk/user/SetupAttemptLimiter.java` | `src/test/java/com/ithelpdesk/user/SetupTokenVerifierTest.java`、`src/test/java/com/ithelpdesk/user/SetupAttemptLimiterTest.java` | 通过；另在 localhost:8080（真实 `ticket-db` dev，未配置口令）用 Chromium 实测：页面显示 `setup-token-missing`，提交后显示 `field-error-setupToken`，密码框被清空，库中没有新增行 |
+| FR-031 / IQA-016 首次设置完整流程（一次性 schema） | 同上 | `src/test/java/com/ithelpdesk/user/InitialAdminSetupIT.java`、`e2e/tests/iqa-016-initial-admin.spec.ts` | 受阻：`CREATE SCHEMA` 权限被拒（DEC-CODING-001） |
+| FR-002（遗留 NULL 哈希账号不可登录） | `src/main/java/com/ithelpdesk/auth/AppUserDetailsService.java`（未改） | `src/test/java/com/ithelpdesk/auth/LegacyAdminLoginIT.java`、`src/test/java/com/ithelpdesk/auth/AppUserDetailsServiceTest.java` | 通过（真实 dev 实例） |
+| TD-016 / TD-017 / TD-018 / TD-019 配置与机密 | `src/main/resources/application.yml`、`src/main/java/com/ithelpdesk/config/AppProperties.java` | `src/test/java/com/ithelpdesk/config/AppPropertiesTest.java`、`src/test/java/com/ithelpdesk/SecretUsagePolicyTest.java` | 通过：`src/main/**` 中唯一的 `AIDH_SECRET_*` 引用是 `application.yml` 中的 `AIDH_SECRET_INITIAL_SETUP_TOKEN` |
+| FR-029、FR-030、NFR-001（IQA-015 的开发者侧辅助证据） | 启动不写账号（删除引导） | `src/test/java/com/ithelpdesk/DataRetentionIT.java` | 通过（真实 dev 实例，重启后快照、报表、`app_user` 行数一致） |
+| IQA-001～IQA-014 回归 | 未改动的业务实现 | `e2e/tests/iqa-001`～`iqa-014` | 通过（localhost:8080 + 真实 dev 实例，16 passed） |
+
+### 执行命令与结果
+
+| 命令 | 环境 | 依赖实例（真实 / 替身） | 结果 | 证据 |
+|---|---|---|---|---|
+| `mvn -B -ntp -q dependency:go-offline`、`cd e2e && npm ci` | Agent Pod | 不涉及 | 通过 | 退出码 0 |
+| Node `pg` + `@azure/identity` 只读探测与 `CREATE SCHEMA` 探测 | Agent Pod | 真实 `ticket-db` dev 实例（PostgreSQL 16.15） | `CREATE SCHEMA` 被拒 | `permission denied for database db_9d4275ee58c5_dev`；`db_create=false`、`pub_create=true`；`public` 中可用管理员（带凭据 ADMIN）0 个，遗留 NULL 哈希 ADMIN 1 个（未修改） |
+| `mvn -B -ntp -q checkstyle:check` | Agent Pod | 不涉及 | 通过 | 没有违规输出 |
+| `mvn -B -ntp test` | Agent Pod 单元 / 切片测试 | 替身只用于纯逻辑（仓库、服务、口令校验、限流），不作为功能证据 | 通过 | `Tests run: 108, Failures: 0, Errors: 0, Skipped: 0`，`BUILD SUCCESS` |
+| `mvn -B -ntp verify -Pintegration -DskipUnitTests=true` | Agent Pod Failsafe | 真实 `ticket-db` dev 实例 | 失败（1 个错误，原因是受阻项） | `Tests run: 40, Failures: 0, Errors: 1`。只有 `InitialAdminSetupIT.startDisposableSchemaContexts` 因 schema 权限失败；`LegacyAdminLoginIT`（2）、`DataRetentionIT`（1）、`MigrationIT`（5）及其余 10 个 IT 类全部通过 |
+| `bash -n .ai-delivery/features/001-v1/runtime/developer-functional-run.sh` | Agent Pod | 不涉及 | 通过 | `syntax-ok` |
+| `bash -euo pipefail .ai-delivery/features/001-v1/runtime/developer-functional-run.sh < /dev/null` | Agent Pod localhost:8080 / 8081 | 真实 `ticket-db` dev 实例 | 失败（退出码 1，原因是受阻项） | 8080 实例 `{"status":"UP"}`；8081 实例 Flyway `Unable to create schema "e2e_setup_e2e_1794890839_99ad64"`（权限被拒）；保底清理 `cleanup` 与 `initial-admin-cleanup` 共 2 项通过 |
+| `java -jar target/helpdesk.jar --server.port=8080` + `npx playwright test --project=chromium` | Agent Pod localhost:8080 + Chromium | 真实 `ticket-db` dev 实例 | 通过 | `16 passed (1.5m)`（种子管理员、IQA-001～IQA-014、按前缀清理） |
+| 同一 8080 实例上的 Playwright 临时脚本（不写库）：登录页 → `setup-link` → `/setup` → 任意口令提交 | Agent Pod localhost:8080 + Chromium | 真实 `ticket-db` dev 实例 | 通过 | `setup-link` 可见；页面显示与字段错误均为“此部署未提供设置口令，暂不能完成设置”；登录名回填，密码框为空；应用日志只有两条 WARN（未配置口令、口令校验失败），不含所提交的口令、登录名或密码 |
+| 执行后只读核对 | Agent Pod | 真实 `ticket-db` dev 实例 | 通过 | 临时脚本使用的登录名没有对应的行；带凭据 ADMIN 仍为 0；`it-%` / `e2e-%` 前缀账号残留 0；`it_setup_%` / `e2e_setup_%` schema 残留 0 |
+
+测试中出现的密码、设置口令都是运行时随机生成的合成值，只存在于进程内存或环境中，没有写入仓库、日志或本报告。
+
+### 使用模拟服务的验证
+
+不涉及：所有依赖都使用真实实例。`docs/dependencies.json` 中唯一的依赖 `ticket-db` 的 `realInstance.dev` 为 true，集成测试与功能测试都连接真实 dev 实例，没有数据库替身。
+
+### Runtime 与下游门禁就绪制品
+
+- `Dockerfile`：未改动（多阶段构建，`USER 10001`，`EXPOSE 8080`）。
+- `runtime/deployment.json`：未改动；命令与 design「部署契约」一致（`containerPort` 8080、`healthPath` `/actuator/health`、`candidateIdentityPath` `/api/candidate-identity`、`requiresPrivateNetwork` false）。
+- Candidate identity endpoint：未改动，只返回平台注入的 `deliveryId` 与 `candidateSha`，不读取它们来决定数据位置（TD-017）。
+- `runtime/developer-functional-run.sh`：已改为双实例流程，`bash -n` 通过；在当前 dev 绑定下 8081 实例无法建 schema，因此 `functionalTests` 不能通过，见受阻项。
+- 候选环境：应用启动时读取 `AIDH_SECRET_INITIAL_SETUP_TOKEN`（`test` 机密，由平台注入）；缺失时照常启动并记录一次 WARN，`/setup` 无法完成（失败即关闭）。
+
+### 延后平台证据
+
+- 候选验证（Runner 在 dev 实例上执行 `deployment.json` 命令序列）、ACR 镜像构建、候选部署后的 health 与 candidate-identity 校验。
+- Independent QA：IQA-001～IQA-014、IQA-016（情形①/②，使用 `AIDH_SECRET_INITIAL_ADMIN_*` 与 `AIDH_SECRET_INITIAL_SETUP_TOKEN`）；UAT、审批与合并。
+
+### 剩余风险
+
+- 如果按 DEC-CODING-001 的推荐项（A）只为 dev 身份授予库级 `CREATE`，候选验证 Runner 以 Agent 身份执行同一套测试，也需要同样的权限，否则 `integrationTests` 与 `functionalTests` 在候选验证中会以相同原因失败。
+- 共享 dev 库 `public` 中目前没有可用管理员，所以 8080 实例的登录页会显示 `setup-link`（预期行为）。如果其他交付在此期间通过 `/setup` 设置了管理员，不影响本项目测试的断言：IQA-001～IQA-014 的断言只针对本次运行前缀创建的数据。
+- T067、T068 的代码只有单元 / 切片证据。在真实实例上的端到端行为（advisory lock 并发、只建一个 ADMIN、关闭后不可接管）要等决定落实后由 `InitialAdminSetupIT` 与 IQA-016 功能测试验证。
+
+### 实施结论
+
+部分完成。完成 15 项任务（T004、T009、T010、T011、T014、T018、T020、T058、T061、T062、T063、T064、T069、T070、T071）：静态检查、108 个单元 / 切片测试、除 `InitialAdminSetupIT` 外的全部 39 个集成测试（真实 dev 实例），以及 IQA-001～IQA-014 浏览器功能测试，在本次都实际通过。
+
+受阻 6 项（T065、T066、T021、T067、T068、T059）。原因是 `ticket-db` dev 绑定的身份不能创建 schema，TD-016 规定的一次性 schema 测试无法执行。相关代码已写好，但没有在真实实例上通过，因此不勾选，也不声称已通过。本次以 `needs_decision` 提出依赖问题，由人决定。

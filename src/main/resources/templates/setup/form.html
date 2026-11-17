@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="zh-CN" xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{layout :: head('设置初始管理员')}"></head>
+<body>
+<header class="topbar"><span class="brand">IT 工单系统</span></header>
+<main class="narrow">
+  <h1>设置初始管理员</h1>
+  <p class="hint">系统尚未设置管理员。请填写部署时提供的设置口令，并设置初始管理员的登录名、密码和姓名。设置完成后此入口将永久关闭。</p>
+  <p th:if="${tokenMissing}" class="flash err" data-testid="setup-token-missing">此部署未提供设置口令，暂不能完成设置</p>
+  <p th:if="${throttled != null and throttled}" class="flash err" data-testid="setup-throttled">尝试次数过多，请 15 分钟后再试</p>
+  <form method="post" th:action="@{/setup}" th:object="${form}" novalidate class="stack">
+    <label>设置口令 <input type="password" name="setupToken" value="" data-testid="setup-token" autocomplete="off"></label>
+    <span th:if="${errors != null and errors['setupToken'] != null}" class="field-error" data-testid="field-error-setupToken" th:text="${errors['setupToken']}"></span>
+    <label>登录名 <input type="text" th:field="*{loginName}" data-testid="setup-login-name" autocomplete="off"></label>
+    <span th:if="${errors != null and errors['loginName'] != null}" class="field-error" data-testid="field-error-loginName" th:text="${errors['loginName']}"></span>
+    <label>密码 <input type="password" name="password" value="" data-testid="setup-password" autocomplete="new-password"></label>
+    <span th:if="${errors != null and errors['password'] != null}" class="field-error" data-testid="field-error-password" th:text="${errors['password']}"></span>
+    <label>姓名 <input type="text" th:field="*{displayName}" data-testid="setup-display-name" autocomplete="off"></label>
+    <span th:if="${errors != null and errors['displayName'] != null}" class="field-error" data-testid="field-error-displayName" th:text="${errors['displayName']}"></span>
+    <button type="submit" data-testid="setup-submit">设置初始管理员</button>
+  </form>
+  <p><a th:href="@{/login}">返回登录</a></p>
+</main>
+</body>
+</html>

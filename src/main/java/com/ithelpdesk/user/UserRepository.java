@@ -17,8 +17,8 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class UserRepository {
 
-    /** 启动引导使用的事务级 advisory lock 键（TD-011）。 */
-    public static final long BOOTSTRAP_LOCK_KEY = 7243011L;
+    /** 设置初始管理员使用的事务级 advisory lock 键（TD-011）。 */
+    public static final long SETUP_LOCK_KEY = 7243011L;
 
     private static final String COLUMNS =
         "id, login_name, password_hash, display_name, role, created_at, created_by";
@@ -87,27 +87,24 @@ public class UserRepository {
             .stream().findFirst();
     }
 
-    // ---------- 启动引导（TD-011） ----------
+    // ---------- 设置初始管理员（TD-011） ----------
 
-    public void acquireBootstrapLock() {
-        jdbc.query("SELECT pg_advisory_xact_lock(:key)", new MapSqlParameterSource("key", BOOTSTRAP_LOCK_KEY),
+    /** 事务级 advisory lock，串行化并发的初始管理员设置。 */
+    public void acquireSetupLock() {
+        jdbc.query("SELECT pg_advisory_xact_lock(:key)", new MapSqlParameterSource("key", SETUP_LOCK_KEY),
             rs -> null);
     }
 
-    public boolean existsAdmin() {
-        Boolean exists = jdbc.queryForObject("SELECT EXISTS(SELECT 1 FROM app_user WHERE role = 'ADMIN')",
+    /** 是否已存在可用管理员（带凭据的 ADMIN）；遗留的 NULL 哈希 ADMIN 不计入。 */
+    public boolean existsCredentialedAdmin() {
+        Boolean exists = jdbc.queryForObject(
+            "SELECT EXISTS(SELECT 1 FROM app_user WHERE role = 'ADMIN' AND password_hash IS NOT NULL)",
             new MapSqlParameterSource(), Boolean.class);
         return Boolean.TRUE.equals(exists);
     }
 
-    /** 插入无凭据的引导管理员；登录名已被占用时不插入并返回 false。 */
-    public boolean insertBootstrapAdmin(String loginName, String displayName, Instant now) {
-        int rows = jdbc.update("INSERT INTO app_user(login_name, password_hash, display_name, role, created_at) "
-                + "VALUES (:login, NULL, :display, 'ADMIN', :now) ON CONFLICT (login_name) DO NOTHING",
-            new MapSqlParameterSource()
-                .addValue("login", loginName)
-                .addValue("display", displayName)
-                .addValue("now", Timestamp.from(now)));
-        return rows > 0;
+    /** 插入初始管理员（role=ADMIN、created_by 为 NULL），返回新 id。 */
+    public long insertInitialAdmin(String loginName, String passwordHash, String displayName, Instant now) {
+        return insert(loginName, passwordHash, displayName, Role.ADMIN, now, null);
     }
 }

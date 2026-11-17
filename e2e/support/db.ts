@@ -22,7 +22,7 @@ export function db(): pg.Pool {
       host: requireEnv('AIDH_DEP_TICKET_DB_HOST'),
       database: requireEnv('AIDH_DEP_TICKET_DB_DATABASE'),
       user: requireEnv('AIDH_DEP_TICKET_DB_USER'),
-      port: 5432,
+      port: Number(requireEnv('AIDH_DEP_TICKET_DB_PORT')),
       ssl: { rejectUnauthorized: true },
       max: 3,
       password: async () => (await credential.getToken(SCOPE)).token,
@@ -55,7 +55,7 @@ export async function createUser(login: string, password: string, display: strin
   return { id: Number(rows[0].id), login, password, display, role };
 }
 
-/** 以运行前缀插入种子管理员（不依赖、不修改启动引导创建的初始管理员）。 */
+/** 以运行前缀在 public schema 插入种子管理员（不依赖、不修改库中其他管理员）。 */
 export async function seedAdmin(prefix: string, password: string): Promise<SeedUser> {
   return createUser(`${prefix}admin`, password, `${prefix}种子管理员`, 'ADMIN');
 }

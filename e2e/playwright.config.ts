@@ -6,6 +6,11 @@ import { randomBytes } from 'node:crypto';
 if (!process.env.E2E_RUN_PREFIX) {
   process.env.E2E_RUN_PREFIX = `e2e-${Date.now()}-${randomBytes(3).toString('hex')}-`;
 }
+// IQA-016 实例所用一次性 schema（TD-016）：由运行前缀转小写下划线派生，与 developer-functional-run.sh 一致。
+if (!process.env.E2E_SETUP_SCHEMA) {
+  process.env.E2E_SETUP_SCHEMA =
+    `e2e_setup_${process.env.E2E_RUN_PREFIX.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')}`;
+}
 if (!process.env.E2E_ADMIN_PASSWORD) {
   process.env.E2E_ADMIN_PASSWORD = `Pw-${randomBytes(12).toString('hex')}`;
 }
@@ -32,8 +37,18 @@ export default defineConfig({
     {
       name: 'chromium',
       testDir: './tests',
+      testIgnore: /iqa-016-initial-admin\.spec\.ts/,
       dependencies: ['setup'],
       use: { ...devices['Desktop Chrome'] },
     },
+    // IQA-016：localhost:8081 上以一次性 schema 启动的第二个实例（TD-016），不插入任何种子数据
+    {
+      name: 'initial-admin',
+      testDir: './tests',
+      testMatch: /iqa-016-initial-admin\.spec\.ts/,
+      teardown: 'initial-admin-cleanup',
+      use: { ...devices['Desktop Chrome'], baseURL: process.env.E2E_SETUP_BASE_URL ?? 'http://localhost:8081' },
+    },
+    { name: 'initial-admin-cleanup', testDir: './support', testMatch: /schema\.teardown\.ts/ },
   ],
 });
