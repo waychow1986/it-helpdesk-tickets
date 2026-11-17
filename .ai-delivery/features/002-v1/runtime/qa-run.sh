@@ -609,8 +609,67 @@ async function reportCheck(a) {
 
 // ================= 运行数据 =================
 const STATE_FILE = STATE_DIR ? path.join(STATE_DIR, 'iqa-state.json') : '';
+// 跨阶段状态：主通道为 QA_STATE_DIR/iqa-state.json；同一内容（不含机密）另存一份到 ticket-db test 库中 QA 自有的 schema（iqa_qa_phase），
+// 用于平台未恢复 QA_STATE_DIR 时的回退。只按 deliveryId + candidateSha 读取 3 小时内最新一份，阶段 2 结束后删除。
+const STATE_SCHEMA = 'iqa_qa_phase';
+const stateSource = { file: STATE_FILE, listing: [], source: null, db: null };
+function listDir(dir, depth = 0) {
+  const out = [];
+  try {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const f = path.join(dir, e.name);
+      if (e.isDirectory()) { out.push(`${f}/`); if (depth < 4) out.push(...listDir(f, depth + 1)); }
+      else { let size = -1; try { size = fs.statSync(f).size; } catch { /* ignore */ } out.push(`${f} (${size} 字节)`); }
+    }
+  } catch (e) { out.push(`${dir}：${e.code ?? e.message}`); }
+  return out;
+}
+function findStateFile(dir, depth = 0) {
+  try {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const f = path.join(dir, e.name);
+      if (e.isFile() && e.name === 'iqa-state.json') return f;
+      if (e.isDirectory() && depth < 4) { const r = findStateFile(f, depth + 1); if (r) return r; }
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+function parseState(text) { const o = JSON.parse(text); return o && o.v === 1 && typeof o.prefix === 'string' && o.prep ? o : null; }
+async function ensureStateTable() {
+  await q(`CREATE SCHEMA IF NOT EXISTS ${STATE_SCHEMA}`);
+  await q(`CREATE TABLE IF NOT EXISTS ${STATE_SCHEMA}.phase_state (id bigserial PRIMARY KEY, delivery_id text NOT NULL, candidate_sha text NOT NULL, prefix text NOT NULL, digest text NOT NULL, body text NOT NULL, created_at timestamptz NOT NULL DEFAULT now())`);
+}
+async function saveStateDb(json, prefix) {
+  try {
+    await ensureStateTable();
+    await q(`DELETE FROM ${STATE_SCHEMA}.phase_state WHERE delivery_id=$1 AND (created_at < now() - interval '1 day' OR prefix=$2)`, [process.env.QA_DELIVERY_ID, prefix]);
+    await q(`INSERT INTO ${STATE_SCHEMA}.phase_state(delivery_id, candidate_sha, prefix, digest, body) VALUES ($1,$2,$3,$4,$5)`, [process.env.QA_DELIVERY_ID, SHA, prefix, sha(json), json]);
+    return { ok: true, digest: sha(json) };
+  } catch (e) { return { ok: false, error: String(e.message).slice(0, 300) }; }
+}
+async function loadStateDb() {
+  try {
+    const r = await q(`SELECT prefix, digest, body, created_at FROM ${STATE_SCHEMA}.phase_state WHERE delivery_id=$1 AND candidate_sha=$2 AND created_at > now() - interval '3 hours' ORDER BY created_at DESC, id DESC LIMIT 1`, [process.env.QA_DELIVERY_ID, SHA]);
+    if (!r.length) return { ok: false, error: '库中没有本候选 3 小时内的阶段 1 状态' };
+    if (sha(r[0].body) !== r[0].digest) return { ok: false, error: '库中状态摘要不一致' };
+    return { ok: true, state: parseState(r[0].body), prefix: r[0].prefix, digest: r[0].digest, createdAt: new Date(r[0].created_at).toISOString() };
+  } catch (e) { return { ok: false, error: String(e.message).slice(0, 300) }; }
+}
+async function dropStateDb(prefix) {
+  try { await q(`DELETE FROM ${STATE_SCHEMA}.phase_state WHERE delivery_id=$1 AND prefix=$2`, [process.env.QA_DELIVERY_ID, prefix]); } catch (e) { rlog(`删除库中阶段状态失败：${e.message}`); }
+}
 let state = null;
-if (MODE === 'phase2') { try { state = JSON.parse(fs.readFileSync(STATE_FILE, 'utf-8')); } catch { state = null; } }
+if (MODE === 'phase2') {
+  stateSource.listing = STATE_DIR ? listDir(STATE_DIR) : ['QA_STATE_DIR 未设置'];
+  const f = STATE_DIR ? findStateFile(STATE_DIR) : null;
+  if (f) { try { state = parseState(fs.readFileSync(f, 'utf-8')); if (state) stateSource.source = `QA_STATE_DIR：${f}`; } catch (e) { stateSource.fileError = e.message; } }
+  if (!state) {
+    try { stateSource.db = await loadStateDb(); } catch (e) { stateSource.db = { ok: false, error: e.message }; }
+    if (stateSource.db?.ok && stateSource.db.state) { state = stateSource.db.state; stateSource.source = `ticket-db ${STATE_SCHEMA}.phase_state（QA_STATE_DIR 未恢复，回退）：prefix=${stateSource.db.prefix} 写入于 ${stateSource.db.createdAt}`; }
+    if (stateSource.db) delete stateSource.db.state;
+  }
+  writeEvd('IQA-010-state-source.json', JSON.stringify(stateSource, null, 2));
+}
 const P = state?.prefix ?? `v2q${crypto.randomBytes(3).toString('hex')}-`; // 本次运行合成数据前缀（不匹配 V1 基线前缀）
 let baseCat = null;
 let otherTicket = null; // 他人（E1）的工单，供 IQA-009 基线员工越权访问
@@ -1482,7 +1541,7 @@ async function main() {
     browser = await chromium.launch();
     try {
       if (MODE === 'phase2' && !state) {
-        await scenario(...T010, async () => need('读取阶段 1 快照状态', false, `QA_STATE_DIR 中没有阶段 1 写入的 iqa-state.json（${STATE_FILE}）`, 'gap'));
+        await scenario(...T010, async () => need('读取阶段 1 快照状态', false, `QA_STATE_DIR 中没有阶段 1 写入的 iqa-state.json（${STATE_FILE}；目录内容 ${JSON.stringify(stateSource.listing.slice(0, 20))}），库内备份也不可用（${stateSource.db?.error ?? '未读取'}）｜证据：IQA-010-state-source.json`, 'gap'));
       } else {
         let setupErr = null;
         try { await setup(); } catch (e) { setupErr = e; }
@@ -1492,18 +1551,28 @@ async function main() {
           if (kind === 'env') envProblem = `前置准备：${msg}`;
           for (const id of expected) await scenario(id, '前置准备失败', async () => need('前置准备（初始管理员登录、合成账号）', false, `${msg}；证据：setup-${MODE}.log`, kind));
         } else if (MODE === 'phase2') {
-          await scenario(...T010, () => iqa010(state.prep, true));
+          rlog(`阶段 1 快照状态来源：${stateSource.source}`);
+          await scenario(...T010, () => { info('阶段 1 快照状态来源', stateSource.source); return iqa010(state.prep, true); });
           await cleanup();
+          await dropStateDb(P);
         } else {
           for (const [id, title, fn] of LIST1) await scenario(id, title, fn);
           const prep = await iqa010Prepare();
           if (MODE === 'phase1') {
-            fs.mkdirSync(STATE_DIR, { recursive: true });
             const accounts = Object.fromEntries(Object.entries(acc).filter(([k]) => k !== 'A1').map(([k, v]) => [k, { id: v.id, login: v.login, display: v.display, role: v.role }]));
             const json = JSON.stringify({ v: 1, prefix: P, accounts, ids, prep });
-            const safe = !SECRET_VALUES.some(sv => json.includes(sv)) ? json : JSON.stringify({ v: 1, prefix: P, accounts, ids, prep: { ok: false, error: '快照含机密值，已拒绝写入状态', kind: 'gap' } });
-            fs.writeFileSync(STATE_FILE, safe);
-            rlog(`阶段 1 状态已写入 ${STATE_FILE}（${Buffer.byteLength(safe)} 字节）`);
+            const safe = !SECRET_VALUES.some(sv => json.toLowerCase().includes(sv.toLowerCase())) ? json : JSON.stringify({ v: 1, prefix: P, accounts, ids, prep: { ok: false, error: '快照含机密值，已拒绝写入状态', kind: 'gap' } });
+            const manifest = { stateDir: STATE_DIR, file: STATE_FILE, bytes: Buffer.byteLength(safe), sha256: sha(safe), prefix: P, prepOk: !!prep?.ok };
+            try {
+              fs.mkdirSync(STATE_DIR, { recursive: true });
+              const fd = fs.openSync(STATE_FILE, 'w'); fs.writeSync(fd, safe); fs.fsyncSync(fd); fs.closeSync(fd);
+              manifest.fileWritten = sha(fs.readFileSync(STATE_FILE, 'utf-8')) === manifest.sha256;
+            } catch (e) { manifest.fileWritten = false; manifest.fileError = e.message; }
+            manifest.db = await saveStateDb(safe, P);
+            manifest.listing = listDir(STATE_DIR);
+            writeEvd('IQA-010-state-manifest.json', JSON.stringify(manifest, null, 2));
+            rlog(`阶段 1 状态：文件 ${STATE_FILE} 写入=${manifest.fileWritten}（${manifest.bytes} 字节）；库内备份=${manifest.db.ok}${manifest.db.error ? ` ${manifest.db.error}` : ''}`);
+            if (!manifest.fileWritten && !manifest.db.ok) testGaps.push(`阶段 1 未能保存 IQA-010 快照状态（QA_STATE_DIR 与库内备份均失败）｜证据：IQA-010-state-manifest.json`);
           } else {
             await scenario(...T010, () => iqa010(prep, false));
             await cleanup();
@@ -1522,7 +1591,7 @@ async function main() {
   writeEvd('node-run.log', runLog.join('\n'));
   let files = [];
   try { files = fs.readdirSync(EVD).sort(); } catch { /* ignore */ }
-  const evidence = ['identity.json', 'health-attempts.log', 'node-run.log', ...files.filter(f => /^setup-.*\.log$/.test(f) || /^IQA-\d{3}(-prepare)?\.log$/.test(f)), ...notes];
+  const evidence = ['identity.json', 'health-attempts.log', 'node-run.log', ...files.filter(f => /^setup-.*\.log$/.test(f) || /^IQA-\d{3}(-prepare)?\.log$/.test(f) || /^IQA-010-state-(manifest|source)\.json$/.test(f)), ...notes];
   let finalDefects = defects, finalGaps = testGaps;
   if (envProblem) { evidence.unshift(redact(`执行环境问题：${envProblem}`)); finalDefects = []; finalGaps = []; }
   const missingScen = expected.filter(id => !scenarios.some(s => s.id === id));

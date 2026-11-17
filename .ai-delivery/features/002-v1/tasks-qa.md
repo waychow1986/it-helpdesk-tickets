@@ -11,6 +11,7 @@
 - 分阶段执行：`runtime/qa-phases.json` 声明在 IQA-010 之前重新部署同一候选（`redeployBefore: ["IQA-010"]`），依据是 spec IQA-010 和人工澄清答案 HT-0005 的第 (2) 点。
   - 阶段 1：执行前置、IQA-009、IQA-001～IQA-008，以及 IQA-010 的前置步骤（新增 V2 数据并记录快照，写入 `QA_STATE_DIR`）。
   - 阶段 2：在平台受控重新部署之后执行 IQA-010 的比对和清理。
+  - 阶段状态的保存与读取：阶段 1 把快照状态写入 `QA_STATE_DIR/iqa-state.json`（写入后 fsync 并校验 SHA-256）。同一份内容（只有摘要，不含机密）另存到 ticket-db test 库中 QA 自有的 schema `iqa_qa_phase.phase_state`，以 deliveryId 和 candidateSha 为键，作为备份。阶段 2 先在 `QA_STATE_DIR` 下递归查找 `iqa-state.json`；找不到时读取本候选 3 小时内最新的库内备份，并校验摘要。实际使用的来源记入 IQA-010 检查点和 `IQA-010-state-source.json`。阶段 2 结束后删除库内备份，阶段 1 写入时删除 1 天前的旧记录。两个来源都不可用时，IQA-010 记为测试缺口，并附 `QA_STATE_DIR` 的目录清单。
   - 没有分阶段执行时，按顺序一次执行全部场景，IQA-010 走 spec 中“不执行重新部署”的只读核对路径。
 
 ## 执行前置（脚本步骤，不是 IQA 场景）
@@ -240,7 +241,7 @@
     - 周报表与当前数据的独立计算一致，非时间相关项与快照相同（统计周期变化或他人修改数据的情况除外）。
     - 没有重新部署时，以上只读项同样成立，结果中注明“未执行再次升级”，并引用开发者升级演练记录（`reports/implementation.md` 中的 UpgradeRehearsalIT、UpgradeInterruptionIT、e2e upgrade-repeat）。
     - 任一不符即失败。
-  - 证据：`IQA-010.log`、`IQA-010-prepare.log`（新增数据与快照摘要）、`IQA-010-redeploy-evidence.json`（平台重新部署证据）、重新部署前后的升级执行记录（记录在检查点中），以及截图；没有重新部署时，附开发者升级演练记录的引用。
+  - 证据：`IQA-010.log`、`IQA-010-prepare.log`（新增数据与快照摘要）、`IQA-010-state-manifest.json`（阶段 1 状态写入清单：路径、大小、SHA-256、库内备份结果）、`IQA-010-state-source.json`（阶段 2 状态来源与 `QA_STATE_DIR` 目录清单）、`IQA-010-redeploy-evidence.json`（平台重新部署证据）、重新部署前后的升级执行记录（记录在检查点中），以及截图；没有重新部署时，附开发者升级演练记录的引用。
 
 ## 覆盖与追溯自检
 
