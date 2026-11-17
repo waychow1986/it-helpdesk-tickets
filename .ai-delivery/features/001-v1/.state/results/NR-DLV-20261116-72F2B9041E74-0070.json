@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0070",
+  "stage": "specification",
+  "outcome": "passed",
+  "summary": "已按 FR-031 与人工审批意见 HT-0018、HT-0019 将一次性设置口令同步到行为模型、前置条件、错误与恢复、凭据安全、测试策略和依赖章节，未引入新行为。",
+  "artifacts": [{"path": ".ai-delivery/features/001-v1/spec.md"}]
+}
