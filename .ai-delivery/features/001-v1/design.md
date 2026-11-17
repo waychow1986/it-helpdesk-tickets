@@ -3,7 +3,7 @@
 ## 技术上下文（Technical Context）
 
 - **交付**：DLV-20261116-72F2B9041E74 V1 · 内部 IT 工单系统；权威输入为 `intent.md`（INT-001～INT-024）、`spec.md`（FR-001～FR-031、NFR-001～NFR-002、IQA-001～IQA-016）与已批准的 `technical-baseline.md`（方案 A）。
-- **仓库现状**：已按本方案上一版完成首轮实现（`pom.xml`、`src/`、`e2e/`、根目录 `Dockerfile`），见 `reports/implementation.md`。本版只因 spec 新增 FR-031 / IQA-016 / AC-021（一次性“设置初始管理员”流程，人工审批意见 HT-DLV-20261116-72F2B9041E74-0011、PQ-003 人工答案 A）及 IQA-015 执行方式改为以 QD-001 人工答案为准（PQ-004 人工答案 C）而修订：TD-011 由“启动引导 + 运维写入首个凭据”改为登录入口的一次性设置流程，新增 TD-016（开发者测试的独立 schema），并同步路由、配置、验证矩阵与 Runbook；其余设计不变。
+- **仓库现状**：已按本方案上一版完成首轮实现（`pom.xml`、`src/`、`e2e/`、根目录 `Dockerfile`），见 `reports/implementation.md`。本版只因 spec 新增 FR-031 / IQA-016 / AC-021（一次性“设置初始管理员”流程，人工审批意见 HT-DLV-20261116-72F2B9041E74-0011、PQ-003 人工答案 A）及 IQA-015 执行方式改为以 QD-001 人工答案为准（PQ-004 人工答案 C）而修订：TD-011 由“启动引导 + 运维写入首个凭据”改为登录入口的一次性设置流程，新增 TD-016（开发者测试的独立 schema），并同步路由、配置、验证矩阵与 Runbook；并因共享 `test` 库上 IQA-016 前置条件的可执行性问题新增 TD-017（数据作用域：`/setup` 开放判定及全部业务数据只在当前部署的 schema 内生效），其作用域粒度待开放决策 DEC-TS-001 由人选定；其余设计不变。
 - **技术栈（定稿）**：
   - 语言与运行时：Java 21（Eclipse Temurin 21）。
   - 框架：Spring Boot 3.5.x（取当时最新补丁版本，由 `spring-boot-starter-parent` 统一管理版本）：Spring MVC + Thymeleaf 服务端渲染、Spring Security（表单登录 + HttpSession + CSRF）、Spring JDBC（`NamedParameterJdbcTemplate`）、Flyway、Spring Boot Actuator、Bean Validation。
@@ -32,8 +32,9 @@
 | 平台：平台不执行迁移；库被多交付与候选共享；不得假设库为空 | 迁移与测试数据 | 应用启动时 Flyway 迁移（PostgreSQL advisory lock 串行、只增不删、忽略来自更新候选的 future 迁移）；测试以唯一运行前缀准备并清理数据 |
 | 平台：Agent Pod 无 Docker 守护进程 | 测试方式 | 不用 Testcontainers；集成测试直连 `dev` 实例 |
 | 平台：`requiresPrivateNetwork` 只能为 false | 部署 | 设为 false |
-| 人工审批意见 HT-DLV-20261116-72F2B9041E74-0011、PQ-003 人工答案 A（FR-031、SC-007、AC-021） | 业务方无需任何人手工修改数据或配置即可获得初始管理员凭据；一次性流程，完成后永久不可用，不构成自助注册 | 登录入口的 `/setup` 流程（TD-011）；可用性只由库中是否已有“带凭据的 ADMIN”决定，事务内 advisory lock 串行；无运维 Runbook、无配置项参与。此决定取代已批准技术基线中“初始管理员由启动时幂等引导逻辑创建”的实现方式（基线该条目的前提是 spec 未定义设置页面，现已由 FR-031 定义） |
-| PQ-004 人工答案 C（IQA-015 / AC-020） | 升级或重新部署的执行方式以 QA 计划中 QD-001 人工答案为准 | 设计不规定 QA 的部署步骤；保证任何同库重新部署或升级（同一候选重部署、新候选 SHA 部署）都保留数据：迁移只增不删、启动不写入任何数据、`/setup` 在已有带凭据 ADMIN 时保持关闭 |
+| 人工审批意见 HT-DLV-20261116-72F2B9041E74-0011、PQ-003 人工答案 A（FR-031、SC-007、AC-021） | 业务方无需任何人手工修改数据或配置即可获得初始管理员凭据；一次性流程，完成后永久不可用，不构成自助注册 | 登录入口的 `/setup` 流程（TD-011）；可用性只由当前数据作用域（TD-017）中是否已有“带凭据的 ADMIN”决定，事务内 advisory lock 串行；无运维 Runbook、无配置项参与。此决定取代已批准技术基线中“初始管理员由启动时幂等引导逻辑创建”的实现方式（基线该条目的前提是 spec 未定义设置页面，现已由 FR-031 定义） |
+| 平台：`test` 库由多个交付与候选共享，不得假设库为空；不得人工改库改配置，不为产品增加测试后门（FR-031、IQA-016、SC-007） | 每个需要验收 IQA-016 的候选都必须能独立获得“尚未设置初始管理员”的状态，且不受其他交付、其他候选、开发者测试或业务方 UAT 数据影响 | TD-017：开放判定与业务数据的作用域 = 由平台注入的部署身份派生的 PostgreSQL schema，与共享库中其他作用域完全隔离；作用域在启动时由部署身份决定，任何请求都无法选择或切换作用域（不是测试后门）；作用域粒度（每个候选版本 / 每个交付）影响 IQA-015 的可执行方式，待 DEC-TS-001 |
+| PQ-004 人工答案 C（IQA-015 / AC-020） | 升级或重新部署的执行方式以 QA 计划中 QD-001 人工答案为准 | 设计不规定 QA 的部署步骤；保证同一数据作用域内的任何重新部署或升级都保留数据（哪些部署属于同一作用域由 DEC-TS-001 决定，见 TD-017）：迁移只增不删、启动不写入任何数据、`/setup` 在已有带凭据 ADMIN 时保持关闭 |
 
 ## 架构概览（Architecture）
 
@@ -76,12 +77,13 @@
 | TD-008 | 处理记录表 `ticket_event` 只追加；工单表冗余 `first_resolved_at`、`first_resolved_assignee_id`，仅在为 NULL 时写入 | 报表口径依赖"首次已解决时刻"与"该时刻处理人"（PQ-002 A），冗余列使报表查询简单且不可被后续变更改写 | 每次报表从事件表回放（查询复杂） | FR-020、FR-027、INV-005 |
 | TD-009 | 公司时区配置项 `app.time-zone`，默认 `Asia/Shanghai`；自然周为 ISO 周（周一 00:00 至下周一 00:00，左闭右开） | 已批准技术基线给出默认时区；A-002 规定周一至周日 | 使用服务器默认时区（容器为 UTC，不符合公司本地时间） | FR-026～FR-028、A-002 |
 | TD-010 | 注入 `java.time.Clock` Bean（生产为 `Clock.system(zone)`），所有"当前时刻"均取自该 Clock，不在 SQL 中用 `now()` | 报表与 72 小时边界可在测试中精确构造；测试可把时钟设到独立的历史周以隔离共享库中的其他数据 | SQL `now()`（不可测试） | FR-027、FR-028 |
-| TD-011 | 一次性“设置初始管理员”流程（FR-031）：`InitialAdminSetupService.isSetupOpen()` = `NOT EXISTS(SELECT 1 FROM app_user WHERE role='ADMIN' AND password_hash IS NOT NULL)`，每次请求实时查询、不缓存；`GET /login` 在开放时显示“设置初始管理员”链接；`GET/POST /setup` 匿名可访问，关闭时一律 HTTP 403 渲染“初始管理员已设置”页且不读写任何账号；`POST /setup` 在单个事务中先取 `pg_advisory_xact_lock(7243011)`、再次判定开放、校验输入（与 `POST /admin/users` 同一校验规则）、登录名唯一检查，最后 INSERT 一个 `role='ADMIN'`、BCrypt 哈希、`created_by=NULL` 的新账号；成功后 302 到 `/login?setup` 提示用该账号登录（不自动登录）。删除上一版的 `InitialAdminBootstrap`、`BootstrapProperties` 与 `app.bootstrap.*` 配置，启动时不再写入任何账号 | 满足“无需人工改数据或配置”（HT-0011）与 PQ-003 A；产品中不存在删除账号或修改管理员身份的功能（FR-004 只允许 EMPLOYEE↔IT_STAFF），因此一旦存在带凭据 ADMIN，判定永久为关闭，满足“永久不可用”；只能新建 ADMIN，不能修改任何既有行，满足“不能新增或接管任何账号”；以“带凭据 ADMIN”而非“任何 ADMIN”判定，使上一版在共享 dev/test 库中留下的 `password_hash IS NULL` 引导账号（不可登录）不会把新环境永久锁住；不缓存判定，使 QA 清理自身数据后同一部署可再次验收 | 启动引导 + 运维 `UPDATE` 写入哈希（上一版，违背 HT-0011）；单独的 `system_setup` 完成标记表（需要额外迁移且共享库中 QA 无法在不改数据的前提下复验）；设置后自动登录（spec 要求“设置成功后即可用该凭据登录”，保留显式登录步骤更直接对应 IQA-016 第 2 步）；启动时生成随机密码打印日志（违反宪章“不记录 secret”） | FR-031、SC-007、AC-021、INT-021、HT-0011、PQ-003 A、宪章「安全与隐私」 |
+| TD-011 | 一次性“设置初始管理员”流程（FR-031）：`InitialAdminSetupService.isSetupOpen()` = `NOT EXISTS(SELECT 1 FROM app_user WHERE role='ADMIN' AND password_hash IS NOT NULL)`，每次请求实时查询、不缓存；`GET /login` 在开放时显示“设置初始管理员”链接；`GET/POST /setup` 匿名可访问，关闭时一律 HTTP 403 渲染“初始管理员已设置”页且不读写任何账号；`POST /setup` 在单个事务中先取 `pg_advisory_xact_lock(7243011)`、再次判定开放、校验输入（与 `POST /admin/users` 同一校验规则）、登录名唯一检查，最后 INSERT 一个 `role='ADMIN'`、BCrypt 哈希、`created_by=NULL` 的新账号；成功后 302 到 `/login?setup` 提示用该账号登录（不自动登录）。删除上一版的 `InitialAdminBootstrap`、`BootstrapProperties` 与 `app.bootstrap.*` 配置，启动时不再写入任何账号 | 满足“无需人工改数据或配置”（HT-0011）与 PQ-003 A；产品中不存在删除账号或修改管理员身份的功能（FR-004 只允许 EMPLOYEE↔IT_STAFF），因此一旦存在带凭据 ADMIN，判定永久为关闭，满足“永久不可用”；只能新建 ADMIN，不能修改任何既有行，满足“不能新增或接管任何账号”；判定 SQL 不带 schema 限定，只在当前数据作用域（TD-017 解析出的 schema）内生效，不读取共享库中其他作用域的账号；以“带凭据 ADMIN”而非“任何 ADMIN”判定，使上一版在共享 dev/test 库中留下的 `password_hash IS NULL` 引导账号（不可登录）不会把新环境永久锁住；不缓存判定，使 QA 清理自身数据后同一部署可再次验收 | 启动引导 + 运维 `UPDATE` 写入哈希（上一版，违背 HT-0011）；单独的 `system_setup` 完成标记表（需要额外迁移且共享库中 QA 无法在不改数据的前提下复验）；设置后自动登录（spec 要求“设置成功后即可用该凭据登录”，保留显式登录步骤更直接对应 IQA-016 第 2 步）；启动时生成随机密码打印日志（违反宪章“不记录 secret”） | FR-031、SC-007、AC-021、INT-021、HT-0011、PQ-003 A、宪章「安全与隐私」 |
 | TD-012 | 列表分页：每页 50 条，按提交时间倒序、id 倒序；页码导航保留查询条件 | 工单持续增长，整表渲染不可控；分页不减少可见集合 | 无分页（数据增长后页面不可用） | FR-010、FR-014、FR-023 |
 | TD-013 | 表单校验全部在服务端完成，表单加 `novalidate`，不使用 HTML `required` | 必须拒绝"仅含空白"的输入并逐项指出缺失项、保留已填内容；浏览器原生校验无法覆盖空白场景 | 仅浏览器校验（不可信、不满足 FR-007） | FR-007、FR-012、FR-018 |
 | TD-014 | 员工访问他人工单或不存在的工单统一返回 HTTP 403 与同一"无权限访问该工单"页面 | 不泄露他人工单是否存在及任何内容 | 他人工单 403、不存在 404（可被用来探测编号） | FR-013、INV-003 |
 | TD-015 | 功能测试用 Node `@playwright/test` 驱动 Pod 预装 Chromium；测试数据准备用 Node `pg` + `@azure/identity` 直连 `dev` 库 | Pod 预装 Node Playwright 与 Chromium；Java Playwright 需额外下载驱动 | Java Playwright；Selenium | IQA-001～IQA-016 的开发者对应验证 |
-| TD-016 | 数据库 schema 可配置：应用属性 `app.db.schema`（默认 `public`，启动时校验匹配 `^[a-z][a-z0-9_]{0,62}$`，否则启动失败），同时作用于 JDBC `currentSchema` 与 Flyway `schemas`/`default-schema`。候选、QA、生产从不设置该属性，始终使用 `public`；只有开发者的“设置初始管理员”集成测试与功能测试以命令行/测试属性设为一次性 schema（`it_setup_<runId>`、`e2e_setup_<runId>`，由 Flyway 自动创建），测试结束以 `DROP SCHEMA <name> CASCADE` 清理。上一版 Flyway 已能在 `dev`/`test` 项目库中建表，说明使用方角色对项目库有建对象权限；Coding 在 `dev` 实例上先验证能创建并删除一次性 schema，若被拒绝，按平台规则以 `decisionsNeeded`（`dependency.name=ticket-db`）提出，不改用替身 | FR-031 的验证需要“尚无带凭据 ADMIN”的起始状态，而共享 `dev` 库的 `public` schema 中存在其他测试的种子管理员；一次性 schema 给出真实 PostgreSQL 上的干净状态，不删除他人数据、不使用替身；不改变产品行为 | 测试前删除库中全部 ADMIN（破坏共享数据）；只做单元测试（不满足真实集成验证）；为 `/setup` 增加测试专用开关（引入产品之外的行为） | FR-031、IQA-016、宪章「测试与质量」 |
+| TD-016 | 数据库 schema 可配置：应用属性 `app.db.schema`（默认 `public`，启动时校验匹配 `^[a-z][a-z0-9_]{0,62}$`，否则启动失败），同时作用于 JDBC `currentSchema` 与 Flyway `schemas`/`default-schema`。候选、QA、生产从不设置该属性（未设置时由 TD-017 解析）；只有开发者的“设置初始管理员”集成测试与功能测试以命令行/测试属性设为一次性 schema（`it_setup_<runId>`、`e2e_setup_<runId>`，由 Flyway 自动创建），测试结束以 `DROP SCHEMA <name> CASCADE` 清理。上一版 Flyway 已能在 `dev`/`test` 项目库中建表，说明使用方角色对项目库有建对象权限；Coding 在 `dev` 实例上先验证能创建并删除一次性 schema，若被拒绝，按平台规则以 `decisionsNeeded`（`dependency.name=ticket-db`）提出，不改用替身 | FR-031 的验证需要“尚无带凭据 ADMIN”的起始状态，而共享 `dev` 库的 `public` schema 中存在其他测试的种子管理员；一次性 schema 给出真实 PostgreSQL 上的干净状态，不删除他人数据、不使用替身；不改变产品行为 | 测试前删除库中全部 ADMIN（破坏共享数据）；只做单元测试（不满足真实集成验证）；为 `/setup` 增加测试专用开关（引入产品之外的行为） | FR-031、IQA-016、宪章「测试与质量」 |
+| TD-017 | 数据作用域（installation scope）：`/setup` 开放判定、全部账号与业务数据只存在于当前部署使用的 PostgreSQL schema 中（复用 TD-016 的 `currentSchema` + Flyway `schemas` 机制，Flyway 在 schema 不存在时自动创建并迁移）。`AppProperties` 在启动时按以下优先级解析 schema，结果在进程生命周期内不变：① 显式设置的 `app.db.schema`（仅开发者测试）；② 平台注入的部署身份——`AIDELIVERY_DELIVERY_ID` 非空（且粒度为“候选版本”时 `AIDELIVERY_CANDIDATE_SHA` 也非空）时派生 schema 名：取值转小写、非 `[a-z0-9]` 字符替换为 `_`；粒度“候选版本”= `cand_<delivery>_<sha 前 12 位>`，粒度“交付”= `dlv_<delivery>`（例如交付 `DLV-20261116-72F2B9041E74` → `dlv_dlv_20261116_72f2b9041e74`，均不超过 63 字符并通过 TD-016 的格式校验）；③ 都没有时为 `public`。解析出的 schema 由 `/api/candidate-identity` 的 `dataSchema` 字段返回（非机密），并在启动时 INFO 记录“数据作用域：<schema>”。作用域粒度（候选版本或交付）待开放决策 DEC-TS-001 由人选定，Coding 只实现被选定的一种；选定前 ②不生效（等同 ③）。若项目库角色无建 schema 权限（Coding 在 `dev` 上按 TD-016 验证），按平台规则以 `decisionsNeeded`（`dependency.name=ticket-db`）提出 | 共享 `test` 库中，以整库为判定范围会使任一非 QA 的初始管理员设置（业务方 SC-007 验收、其他交付或候选）把后续所有候选的 `/setup` 永久关闭，IQA-016 前置条件无法获得；按部署身份隔离后，共享库中其他交付/候选/业务方 UAT 的数据处于其他 schema，对本作用域的判定与数据既不可见也不可写；FR-031 的“永久不可用”在每个作用域内完全保持（产品无删除账号或降级 ADMIN 的功能）；作用域只由平台注入的部署身份决定，请求无法影响，不构成测试后门；判定 SQL 与产品行为不变 | 整库判定（上一版，IQA-016 可执行性依赖库为空的假设，被门禁否决）；在 `app_user` 上增加作用域列并逐条过滤（需改动所有查询与唯一约束，易漏过滤导致跨作用域泄露）；QA 删除他人管理员以重新打开（破坏他人数据，违反平台规则）；为 `/setup` 增加测试开关或请求参数选择作用域（测试后门）；每候选独立数据库实例（平台不提供，见 DEC-TS-001 选项 C） | FR-031、FR-030、SC-007、IQA-015、IQA-016、技术基线“库由多交付与候选共享” |
 
 ## 领域与数据模型
 
@@ -274,7 +276,7 @@ SQL 结构：`WHERE 1=1` + 可见范围（员工：`submitter_id = :currentUserI
 
 - 工单写操作以行锁串行化；同一工单的并发认领/分派以"后提交者生效"，每次变更都有完整前后值记录。
 - 应用无状态于本地文件；HttpSession 在内存中，重新部署后用户需重新登录（数据不受影响）。
-- 启动顺序：读取配置（校验 `app.db.schema`）→ 建连接池 → Flyway 迁移（advisory lock）→ 启动 Web；启动阶段不写入任何业务数据或账号；迁移失败则进程退出（非零），健康检查不通过，候选部署失败而非带病运行。
+- 启动顺序：读取配置（按 TD-017 解析数据作用域并校验 schema 名）→ 建连接池 → Flyway 迁移（advisory lock）→ 启动 Web；启动阶段不写入任何业务数据或账号；迁移失败则进程退出（非零），健康检查不通过，候选部署失败而非带病运行。
 
 ## Interface 与契约（Contract）
 
@@ -305,7 +307,7 @@ SQL 结构：`WHERE 1=1` + 可见范围（员工：`submitter_id = :currentUserI
 | `POST /admin/categories/{id}/remove` | 管理员 | 软删除 | FR-006 |
 | `GET /admin/reports/weekly` | 管理员 | 周报表 | FR-025～FR-028 |
 | `GET /actuator/health` | 匿名 | 平台 healthPath；返回 `{"status":"UP"}`，不暴露详情 | 平台 |
-| `GET /api/candidate-identity` | 匿名 | JSON：`{"deliveryId": $AIDELIVERY_DELIVERY_ID, "candidateSha": $AIDELIVERY_CANDIDATE_SHA}`；变量缺失时值为空字符串 | 平台 |
+| `GET /api/candidate-identity` | 匿名 | JSON：`{"deliveryId": $AIDELIVERY_DELIVERY_ID, "candidateSha": $AIDELIVERY_CANDIDATE_SHA, "dataSchema": <TD-017 解析出的 schema>}`；变量缺失时前两项为空字符串 | 平台、TD-017 |
 
 ### 统一行为契约
 
@@ -324,10 +326,11 @@ SQL 结构：`WHERE 1=1` + 可见范围（员工：`submitter_id = :currentUserI
 
 ### 数据库数据契约（供测试准备数据）
 
-开发者测试与 Independent QA 可以使用各自环境身份直连 `ticket-db`，按上文表结构插入合成数据并按前缀清理：
+开发者测试与 Independent QA 可以使用各自环境身份直连 `ticket-db`，按上文表结构在应用当前数据作用域的 schema 中插入合成数据并按前缀清理（Independent QA 从候选的 `/api/candidate-identity` 读取 `dataSchema`，连接时设置 `search_path` 为该 schema；不得读写其他 schema）：
 
 - 管理员种子（仅开发者测试在 `dev` 库 `public` schema 中使用）：`INSERT INTO app_user(login_name,password_hash,display_name,role,created_at) VALUES(<唯一前缀登录名>, <BCrypt 哈希，$2a$/$2b$/$2y$ 均可>, <姓名>, 'ADMIN', now())`。断言账号列表时只针对本次运行创建的账号；遗留的 NULL 哈希 ADMIN 行不得修改或依赖。
-- “设置初始管理员”开放判定：`public` schema 中不存在 `role='ADMIN' AND password_hash IS NOT NULL` 的行。由于判定覆盖整个库，Independent QA 在 `test` 库上验证 IQA-016 时：先执行 IQA-016，不预先向库中插入带凭据的 ADMIN；其他场景所需管理员由该初始管理员在系统内创建（spec 测试策略）；QA 使用的登录名统一带本次运行前缀，结束时按前缀清理（含初始管理员），使同一部署可被再次验收。执行前若库中已存在带凭据 ADMIN（他人遗留数据），属于执行环境状态问题，按平台归类规则在 evidence 中记录诊断。
+- “设置初始管理员”开放判定：当前数据作用域（TD-017）的 schema 中不存在 `role='ADMIN' AND password_hash IS NOT NULL` 的行；判定范围不包括共享库中的其他 schema（`public`、其他交付或候选的 schema、开发者测试的一次性 schema）。
+- IQA-016 前置状态的获得方式：新作用域在其第一次部署启动时由 Flyway 创建为空 schema，启动不写入任何账号，因此天然满足“新部署、尚未设置初始管理员、未预先插入或修改任何账号数据或配置”；QA 不需要也不得为此改库或改配置。Independent QA 先执行 IQA-016，其他场景所需管理员由该初始管理员在系统内创建（spec 测试策略）；QA 账号统一带本次运行前缀，结束时按前缀清理（含初始管理员，属 QA 自己创建的测试数据），使同一部署上的 QA 重跑可再次获得开放状态。与其他数据的关系：其他交付、其他候选和开发者测试的数据位于各自 schema，不影响本作用域；业务方在某个作用域中按 SC-007 完成的设置只关闭该作用域的流程（FR-031 永久性在该作用域内成立）。哪些部署属于同一作用域由 DEC-TS-001 决定：粒度为“候选版本”时，每个新候选（含 bugfix/convergence 产生的候选）都是新作用域；粒度为“交付”时，同一交付的全部候选共享一个作用域，业务方 UAT 设置之后的候选无法再获得该前置状态（见 DEC-TS-001）。
 - 回溯时间工单：直接写入 `ticket.submitted_at`；需要"首次已解决"时同时写入 `status`、`first_resolved_at`、`first_resolved_assignee_id` 与对应 `STATUS` 事件，保持与应用写入一致的语义。
 - 清理顺序：`ticket_event` → `ticket_comment` → `ticket` → `category` → `app_user`（按本次运行前缀识别）。
 - 共享库中存在其他交付/候选的数据：断言必须限定在本次运行创建的数据上，或在同一时刻以独立 SQL 计算期望值进行比较。
@@ -342,7 +345,7 @@ SQL 结构：`WHERE 1=1` + 可见范围（员工：`submitter_id = :currentUserI
 - **输入验证**：服务端 Bean Validation + 服务层规则；SQL 全部参数化；Thymeleaf 默认 HTML 转义（`th:text`），禁止 `th:utext` 渲染用户内容；描述与沟通内容以 `white-space: pre-wrap` 展示换行。
 - **安全响应头**：Spring Security 默认头（`X-Content-Type-Options`、`X-Frame-Options: DENY`、`Cache-Control: no-store`）+ `Content-Security-Policy: default-src 'self'`（页面不使用内联脚本）。
 - **数据库身份**：`DefaultAzureCredential`（候选/QA 为工作负载身份，Agent Pod 为 Pod 身份）；令牌受众 `https://ossrdbms-aad.database.windows.net/.default`；无密码、无连接字符串 secret；`docs/dependencies.json` 中 `secret=false`。
-- **初始管理员**（TD-011）：由业务方在新部署环境的登录入口通过一次性 `/setup` 流程自行设置，无需任何人改库或改配置，也无默认密码、启动生成密码或运维 Runbook。密码只在请求内存中做 BCrypt 哈希，不回显（校验失败重渲染时密码框清空）、不记录日志。流程开放期间任何能访问登录页的人都可完成设置（这是 PQ-003 A 选定的行为），因此部署后应由业务方尽快完成设置；完成后流程永久关闭。`POST /setup` 受全局 CSRF 保护。
+- **初始管理员**（TD-011、TD-017）：由业务方在新部署环境（新数据作用域）的登录入口通过一次性 `/setup` 流程自行设置，无需任何人改库或改配置，也无默认密码、启动生成密码或运维 Runbook。密码只在请求内存中做 BCrypt 哈希，不回显（校验失败重渲染时密码框清空）、不记录日志。流程开放期间任何能访问登录页的人都可完成设置（这是 PQ-003 A 选定的行为），因此部署后应由业务方尽快完成设置；完成后流程永久关闭。`POST /setup` 受全局 CSRF 保护。
 - **日志隐私**：不记录请求体、查询参数中的关键词、工单标题/描述/沟通内容、密码、令牌；`RequestLogFilter` 只记录方法、匹配的路由模板、状态码、耗时、用户 id。
 
 ## 配置、可观测性与运维
@@ -360,13 +363,13 @@ SQL 结构：`WHERE 1=1` + 可见范围（员工：`submitter_id = :currentUserI
 | `spring.datasource.hikari.maximum-pool-size` / `max-lifetime` / `connection-timeout` | `10` / `30m` / `30s` |
 | `spring.flyway.baseline-on-migrate` / `baseline-version` | `true` / `0` |
 | `spring.flyway.schemas` / `default-schema` | `${app.db.schema}` / `${app.db.schema}` |
-| `app.db.schema` | `public`（TD-016；只有开发者测试覆盖） |
+| `app.db.schema` | 默认不设置，按 TD-017 解析（显式值只用于开发者测试，TD-016） |
 | `management.endpoints.web.exposure.include` | `health` |
 | `management.endpoint.health.show-details` | `never` |
 | `app.time-zone` | `Asia/Shanghai` |
 | `spring.thymeleaf.cache` | `true` |
 
-- 应用只从 `AIDH_DEP_TICKET_DB_*`（`HOST`、`PORT`、`DATABASE`、`USER`）读取数据库配置，`AIDELIVERY_DELIVERY_ID`、`AIDELIVERY_CANDIDATE_SHA` 只用于候选身份端点；不引入其他项目专用环境变量。
+- 应用只从 `AIDH_DEP_TICKET_DB_*`（`HOST`、`PORT`、`DATABASE`、`USER`）读取数据库配置，`AIDELIVERY_DELIVERY_ID`、`AIDELIVERY_CANDIDATE_SHA` 只用于候选身份端点与 TD-017 的数据作用域解析；不引入其他项目专用环境变量。
 - 容器 JVM 参数：`-XX:MaxRAMPercentage=75`。
 
 ### 可观测性
@@ -377,7 +380,7 @@ SQL 结构：`WHERE 1=1` + 可见范围（员工：`submitter_id = :currentUserI
 
 ### 运维要点
 
-- 新部署环境首次投入使用：业务方打开登录页，点击“设置初始管理员”完成设置后登录；无需运维介入。启动时不创建任何账号。
+- 新部署环境（新数据作用域，TD-017）首次投入使用：业务方打开登录页，点击“设置初始管理员”完成设置后登录；无需运维介入。启动时不创建任何账号。
 - 迁移在启动时自动执行，无需手动操作。
 
 ## SLO、限制、扩缩容、重试与恢复
@@ -402,6 +405,7 @@ SQL 结构：`WHERE 1=1` + 可见范围（员工：`submitter_id = :currentUserI
   - Flyway 版本化脚本位于 `src/main/resources/db/migration/`，命名 `V<n>__<desc>.sql`；已提交的迁移文件永不修改。
   - 只做增量变更（新增表/列/索引；新增列须可空或带默认值）；禁止 `DROP`、`TRUNCATE`、`DELETE` 业务数据、改列类型导致数据损失（NFR-001、FR-030）。
   - 多候选共享库：旧版本应用遇到更新候选已应用的迁移时按 `*:future` 忽略；新列对旧代码透明。
+  - 数据作用域（TD-017）：迁移只作用于当前 schema；新作用域首次启动时 Flyway 创建 schema 并从 V1 迁移。应用不删除任何 schema（包括旧候选的 schema），共享 `test` 库中残留的旧作用域是测试环境数据，不影响当前作用域。
 - **Rollout**：平台构建镜像 → 部署候选 → 启动时迁移 → health 与 candidate-identity 校验通过。
 - **Rollback**：回滚到上一镜像即可；由于迁移只增不删，旧镜像可在新 schema 上运行；不提供 schema 回退脚本（回退脚本会删除数据）。
 
@@ -411,13 +415,13 @@ SQL 结构：`WHERE 1=1` + 可见范围（员工：`submitter_id = :currentUserI
 |---|---|---|---|---|---|
 | 静态分析（Checkstyle） | Coding 自测 + 候选验证 | Agent Pod / Runner | 无 | `mvn checkstyle:check` 输出 | 候选验证 `staticAnalysis` 通过 |
 | 构建（jar） | Coding 自测 + 候选验证 | Agent Pod / Runner | 无 | `mvn package` 输出 | 候选验证 `build` 通过；ACR Tasks 镜像构建 |
-| 单元/切片测试（校验规则、报表周边界与格式化、授权规则、`RoleRefreshFilter`、关键词转义、`@WebMvcTest` 403/302 行为、`/setup` 匿名可达且 CSRF 生效、`InitialAdminSetupService` 分支（关闭时不写入、校验失败不写入、登录名重复不写入）、`AppUserDetailsService` 对 NULL 哈希返回禁用用户、`app.db.schema` 非法值启动失败） | Coding 自测 + 候选验证 | Agent Pod / Runner | 无（数据库以外的纯逻辑，可用替身，不作为功能证据） | `mvn test` 报告 | `developerTests` 通过 |
-| 集成测试（Flyway 迁移可重复执行、`InitialAdminSetupIT`（一次性 schema `it_setup_<runId>`，TD-016）：空 schema 迁移后开放、启动不写入任何账号、必填项为空不创建且仍开放、成功创建 BCrypt 哈希 ADMIN 后关闭、关闭后再提交不新增或修改任何行、两个并发提交只成功一个、遗留 NULL 哈希 ADMIN 行不影响开放判定且不被修改、结束 `DROP SCHEMA ... CASCADE`；`public` schema 中以本次运行前缀插入的 NULL 哈希 ADMIN 账号用任意密码登录均失败且提示与凭据错误相同、`ck_app_user_password` 拒绝 NULL 哈希的非 ADMIN 行、仓库 SQL、搜索/筛选组合、员工隔离、认领/分派/状态事务与首次已解决、报表四项口径含 72 小时边界、跨周、再次解决、未分配、已移除类别、无数据） | Coding 自测 + 候选验证 | Agent Pod / Runner，真实 `ticket-db` `dev` 实例 | `AIDH_DEP_TICKET_DB_*` + Pod/Agent 身份 Entra 令牌 | `mvn verify -Pintegration` 报告；运行前缀与清理记录 | `integrationTests` 通过 |
+| 单元/切片测试（TD-017 作用域解析：显式值优先、按部署身份派生的名称与格式、缺少部署身份时为 `public`；校验规则、报表周边界与格式化、授权规则、`RoleRefreshFilter`、关键词转义、`@WebMvcTest` 403/302 行为、`/setup` 匿名可达且 CSRF 生效、`InitialAdminSetupService` 分支（关闭时不写入、校验失败不写入、登录名重复不写入）、`AppUserDetailsService` 对 NULL 哈希返回禁用用户、`app.db.schema` 非法值启动失败） | Coding 自测 + 候选验证 | Agent Pod / Runner | 无（数据库以外的纯逻辑，可用替身，不作为功能证据） | `mvn test` 报告 | `developerTests` 通过 |
+| 集成测试（Flyway 迁移可重复执行、TD-017：以模拟的部署身份环境变量启动的上下文在派生 schema 中建表、该 schema 中的带凭据 ADMIN 不影响另一 schema 的开放判定（两者均为一次性 schema，结束删除）、`/api/candidate-identity` 返回 `dataSchema`；`InitialAdminSetupIT`（一次性 schema `it_setup_<runId>`，TD-016）：空 schema 迁移后开放、启动不写入任何账号、必填项为空不创建且仍开放、成功创建 BCrypt 哈希 ADMIN 后关闭、关闭后再提交不新增或修改任何行、两个并发提交只成功一个、遗留 NULL 哈希 ADMIN 行不影响开放判定且不被修改、结束 `DROP SCHEMA ... CASCADE`；`public` schema 中以本次运行前缀插入的 NULL 哈希 ADMIN 账号用任意密码登录均失败且提示与凭据错误相同、`ck_app_user_password` 拒绝 NULL 哈希的非 ADMIN 行、仓库 SQL、搜索/筛选组合、员工隔离、认领/分派/状态事务与首次已解决、报表四项口径含 72 小时边界、跨周、再次解决、未分配、已移除类别、无数据） | Coding 自测 + 候选验证 | Agent Pod / Runner，真实 `ticket-db` `dev` 实例 | `AIDH_DEP_TICKET_DB_*` + Pod/Agent 身份 Entra 令牌 | `mvn verify -Pintegration` 报告；运行前缀与清理记录 | `integrationTests` 通过 |
 | 功能测试（localhost 启动应用，Playwright Chromium 以三种身份走通 IQA-001～IQA-014 对应流程；另在 localhost:8081 以一次性 schema `e2e_setup_<runId>` 启动第二个实例，走通 IQA-016 对应流程：登录页有入口且无注册入口、留空提交被拒、完成设置、登录并创建员工/新增类别/打开周报表、退出后入口不显示、直接访问 `/setup` 得 403、用另一组凭据提交被拒且该凭据登录失败、原管理员仍可登录、页面不回显密码） | Coding 自测 + 候选验证 | Agent Pod / Runner，localhost:8080 / 8081 + `dev` 实例 | 同上；8080 实例的管理员种子由 `e2e/support/db.ts` 插入；8081 实例不插入任何数据 | `developer-functional-run.sh` 输出与 Playwright 报告 | `functionalTests` 通过 |
 | 候选部署校验（镜像非 root、health、candidate-identity） | 候选验证 | 平台 `cand-{deliveryShortId}` + `test` 实例 | 候选工作负载身份 | 无（平台执行） | 平台部署记录 |
-| Independent QA 验收 IQA-001～IQA-016 | Independent QA | 已部署候选 HTTPS 地址 + `test` 实例 | QA 工作负载身份；初始管理员经 `/setup` 设置（IQA-016 先执行），其他管理员在系统内创建；QA 可自行插入回溯时间的工单数据（见“数据库数据契约”） | 无（Coding 不编写 `qa-run.sh`） | `qa-result.json` |
-| IQA-015 升级或重新部署后数据保留 | Independent QA，按 QA 计划 QD-001 人工答案规定的方式执行升级或重新部署（PQ-004 C） | 候选环境 + `test` 实例（同一份已保存数据） | 同上 | 集成测试证明迁移可重复执行、不删数据、启动不写入数据（辅助证据） | QA 前后快照对比与部署执行记录 |
-| IQA-016 新环境获得初始管理员 | Independent QA | 已部署候选 + `test` 实例，库中无带凭据 ADMIN | 不预先插入或修改任何账号数据 | 开发者功能测试中的对应流程（辅助证据） | `qa-result.json` 中 IQA-016 |
+| Independent QA 验收 IQA-001～IQA-016 | Independent QA | 已部署候选 HTTPS 地址 + `test` 实例（候选的数据作用域 schema，取自 `dataSchema`） | QA 工作负载身份；初始管理员经 `/setup` 设置（IQA-016 先执行），其他管理员在系统内创建；QA 可自行插入回溯时间的工单数据（见“数据库数据契约”） | 无（Coding 不编写 `qa-run.sh`） | `qa-result.json` |
+| IQA-015 升级或重新部署后数据保留 | Independent QA，按 QA 计划 QD-001 人工答案规定的方式执行升级或重新部署（PQ-004 C） | 候选环境 + `test` 实例（同一数据作用域中的同一份已保存数据；粒度为“候选版本”时只有同一候选版本的重新部署属于同一作用域，见 DEC-TS-001） | 同上 | 集成测试证明迁移可重复执行、不删数据、启动不写入数据、同一部署身份重启后解析出同一 schema（辅助证据） | QA 前后快照对比与部署执行记录 |
+| IQA-016 新环境获得初始管理员 | Independent QA | 已部署候选 + `test` 实例；前置状态由新数据作用域天然提供（TD-017），与共享库中其他作用域无关 | 不预先插入或修改任何账号数据或配置 | 开发者功能测试中的对应流程（辅助证据） | `qa-result.json` 中 IQA-016 |
 
 替身使用说明：`dev`、`test` 均声明 `realInstance=true`，集成测试与功能测试不得使用数据库替身；单元测试中的替身只用于纯逻辑，不计入 functional/integration 证据。
 
@@ -447,8 +451,8 @@ curl -s localhost:8080/api/candidate-identity
 
 | 现象 | 排查 | 处置 |
 |---|---|---|
-| 新部署环境无人能登录 | 打开登录页，看是否显示“设置初始管理员” | 显示：由业务方点击完成设置后登录（无需运维改库或改配置）；不显示：库中已有带凭据的管理员，请联系已有管理员 |
-| 业务方访问 `/setup` 得到“此入口不可用” | 预期行为：库中已有带凭据的管理员（FR-031） | 使用已有管理员账号登录；应用不提供重新开放该流程的方式 |
+| 新部署环境无人能登录 | 打开登录页，看是否显示“设置初始管理员” | 显示：由业务方点击完成设置后登录（无需运维改库或改配置）；不显示：当前数据作用域中已有带凭据的管理员，请联系已有管理员 |
+| 业务方访问 `/setup` 得到“此入口不可用” | 预期行为：当前数据作用域中已有带凭据的管理员（FR-031）；`/api/candidate-identity` 的 `dataSchema` 显示当前作用域 | 使用已有管理员账号登录；应用不提供重新开放该流程的方式 |
 | 启动失败、health 不通 | 查看容器日志中 Flyway 或连接错误 | 连接/令牌错误：确认依赖绑定与工作负载身份权限（平台依赖绑定节点）；迁移校验失败：检查是否有人修改了已应用的迁移文件，按"只增不删"新增修正迁移 |
 | 间歇性数据库连接认证失败 | 日志中 PostgreSQL 认证错误 | 确认 `maxLifetime` 小于令牌有效期；检查身份令牌获取是否受限 |
 | 用户反映身份变更未生效 | 查询该账号 `role` | `RoleRefreshFilter` 每请求刷新；若库中已是新值，请用户刷新页面 |
@@ -457,4 +461,9 @@ curl -s localhost:8080/api/candidate-identity
 
 ## 开放决策
 
-无。
+- **DEC-TS-001**（影响 FR-031、FR-030、IQA-015、IQA-016、SC-007；TD-017）：数据作用域的粒度。共享 `test` 库中 IQA-016 的前置状态与 IQA-015 的“同一份数据经升级/重新部署后保留”无法在同一种整库判定下同时独立成立；选项：
+  - **A**：每个候选版本一个作用域（`cand_<delivery>_<sha12>`）。每个新候选都满足 IQA-016 前置条件，任何人的设置互不影响；IQA-015 在候选环境中只能以“同一候选版本重新部署”的方式执行（若 QD-001 规定为部署新候选版本于同一份数据，则不满足）；业务方每个新候选需重新设置 UAT 数据；未注入部署身份的部署使用 `public`，若正式发布也注入候选 SHA，则每次发布切换到新的空作用域，需在发布方式上另行确认。
+  - **B**：每个交付一个作用域（`dlv_<delivery>`）。同一交付的候选之间升级保留数据，IQA-015 两种执行方式都可行；与其他交付隔离；但业务方 UAT 或其他非 QA 的设置之后，本交付后续候选的 IQA-016 前置条件无法获得，需另行调整 IQA-016 前置条件（回退 specification）。
+  - **C**：保持整库判定，由平台为每个候选的 `test` 环境提供独立数据库实例（平台目前不提供，需平台/运维变更）。
+  - **D**：保持整库判定，回退 specification 调整 IQA-016 前置条件（例如允许在已设置的环境中只验证关闭行为）。
+  在人作出决定之前，Coding 不实现 TD-017 的部署身份派生规则（等同解析结果为 `public`）。
