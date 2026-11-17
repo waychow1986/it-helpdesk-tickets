@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261117-88E4DAE97F6A-0015",
+  "stage": "specification",
+  "outcome": "passed",
+  "summary": "按人工答案 HT-DLV-20261117-88E4DAE97F6A-0005 与审批意见 HT-0006，仅修订 spec.md 的 IQA-009（改用 V1 IQA-015 升级基线逐项核对，不再部署 V1）、IQA-010（受控重新部署同一候选，能力不可用时只读核对并引用开发者升级演练）、测试策略（开发者升级演练、Independent QA 执行方式、测试素材、总体通过标准）及依赖中对应条目，其余内容未改动。",
+  "artifacts": [
+    { "path": ".ai-delivery/features/002-v1/spec.md" }
+  ]
+}
