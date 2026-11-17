@@ -447,3 +447,79 @@
 部分完成。完成 15 项任务（T004、T009、T010、T011、T014、T018、T020、T058、T061、T062、T063、T064、T069、T070、T071）：静态检查、108 个单元 / 切片测试、除 `InitialAdminSetupIT` 外的全部 39 个集成测试（真实 dev 实例），以及 IQA-001～IQA-014 浏览器功能测试，在本次都实际通过。
 
 受阻 6 项（T065、T066、T021、T067、T068、T059）。原因是 `ticket-db` dev 绑定的身份不能创建 schema，TD-016 规定的一次性 schema 测试无法执行。相关代码已写好，但没有在真实实例上通过，因此不勾选，也不声称已通过。本次以 `needs_decision` 提出依赖问题，由人决定。
+
+## Coding Session NR-DLV-20261116-72F2B9041E74-0083-b01
+
+### 实施范围
+
+- 模式：`coding`，第 1 批。依据人工澄清答案 HT-DLV-20261116-72F2B9041E74-0023（DEC-CODING-001 选 A）：平台已允许项目在自己的项目库中创建和删除 schema，保持 TD-016，重跑受阻任务。
+- 本次处理的任务：上一 Session（NR-DLV-20261116-72F2B9041E74-0082-b01）受阻的 T065、T066、T021、T067、T068、T059。来源：FR-031、AC-021、IQA-016、SC-007、TD-011、TD-016、TD-017、TD-019，以及宪章「测试与质量」「交付治理」。
+- 这些任务的代码已在上一 Session 写好，只差真实实例上的验证。本次没有修改任何生产代码、测试代码或脚本，只在真实 `ticket-db` `dev` 实例上按 `deployment.json` 顺序完整重跑验证。
+
+### 完成与受阻任务
+
+- 已完成（本次由 `[ ]` 改为 `[x]`，与结果文件 `progress.completedTaskIds` 一致）：T021、T065、T066、T067、T068、T059。
+  - T065：先确认当前身份可以创建并删除一次性 schema（`has_database_privilege(current_user, current_database(), 'CREATE')` 现在为 true，`InitialAdminSetupIT` 的 `@BeforeAll` 前置探测通过）。之后 8 个用例全部通过，覆盖：迁移后开放且启动未写账号；口令为空或错误时不创建；连续 5 次错误后第 6 次即使口令正确也返回 429；必填项为空不创建；遗留 NULL 哈希 ADMIN 不影响开放判定也不被修改；并发提交只成功一个，新管理员可以认证；关闭后提交不新增或修改任何行；未配置口令时失败即关闭。
+  - T066 / T021：双实例功能脚本完整通过，`initial-admin` project 在 8081 一次性 schema 实例上通过 IQA-016 情形①。
+  - T067 / T068：生产实现现在有真实集成与功能证据（上面两项），任务依赖已全部满足。
+  - T059：完整命令序列全部通过，见下方“执行命令与结果”。
+- 受阻任务：无。`tasks-implementation.md` 中已没有未勾选任务。
+
+### 变更文件
+
+| 路径 | 变更 | 来源任务 |
+|---|---|---|
+| `.ai-delivery/features/001-v1/tasks-implementation.md` | 勾选 T021、T065、T066、T067、T068、T059（只把 `[ ]` 改为 `[x]`） | T021、T065、T066、T067、T068、T059 |
+| `.ai-delivery/features/001-v1/reports/implementation.md` | 末尾追加本 Session 记录 | T059 |
+| `src/**`、`e2e/**`、`.ai-delivery/features/001-v1/runtime/**`、`Dockerfile` | 未改动。上一 Session 写好的代码在 schema 权限放开后原样通过 | T065、T066、T021、T067、T068 |
+
+### 需求与场景覆盖
+
+| 来源（FR / AC / IQA） | 实现路径 | 测试路径 | 结果 |
+|---|---|---|---|
+| FR-031 / AC-021 / IQA-016：一次性 schema 上的首次设置完整流程（开放判定、口令、限流、必填、遗留行、并发、关闭、失败即关闭） | `src/main/java/com/ithelpdesk/user/InitialAdminSetupService.java`、`src/main/java/com/ithelpdesk/user/InitialAdminSetupController.java`、`src/main/java/com/ithelpdesk/user/SetupTokenVerifier.java`、`src/main/java/com/ithelpdesk/user/SetupAttemptLimiter.java`、`src/main/java/com/ithelpdesk/user/UserRepository.java` | `src/test/java/com/ithelpdesk/user/InitialAdminSetupIT.java` | 通过（真实 `ticket-db` dev 实例，`Tests run: 8, Failures: 0, Errors: 0`） |
+| IQA-016 情形① / SC-007：登录页入口、口令被拒、设置成功、登录后管理操作、入口关闭、直接 POST 被拒、不能接管 | 同上，另有 `src/main/java/com/ithelpdesk/auth/LoginController.java`、`src/main/java/com/ithelpdesk/config/SecurityConfig.java`、`src/main/resources/templates/login.html`、`src/main/resources/templates/setup/form.html`、`src/main/resources/templates/setup/closed.html` | `e2e/tests/iqa-016-initial-admin.spec.ts` | 通过（localhost:8081 一次性 schema 实例 + Chromium + 真实 dev 实例） |
+| IQA-001～IQA-014 回归 | 业务实现（未改） | `e2e/tests/iqa-001`～`iqa-014` | 通过（localhost:8080 `public` schema + 真实 dev 实例） |
+| FR-001～FR-030、NFR-001～NFR-002 开发者侧集成证据 | 业务实现（未改） | `src/test/java/com/ithelpdesk/**/*IT.java` | 全部 47 个集成测试通过 |
+| TD-018 / TD-019 机密使用 | `src/main/resources/application.yml` | `src/test/java/com/ithelpdesk/SecretUsagePolicyTest.java` | 通过；`grep -rn AIDH_SECRET_ src/main` 只命中 `application.yml:59` 的 `AIDH_SECRET_INITIAL_SETUP_TOKEN` |
+
+### 执行命令与结果
+
+| 命令 | 环境 | 依赖实例（真实 / 替身） | 结果 | 证据 |
+|---|---|---|---|---|
+| `mvn -B -ntp -q dependency:go-offline`、`cd e2e && npm ci` | Agent Pod | 不涉及 | 通过 | 退出码 0 |
+| `mvn -B -ntp checkstyle:check` | Agent Pod | 不涉及 | 通过 | 退出码 0，`BUILD SUCCESS` |
+| `mvn -B -ntp -DskipTests package` | Agent Pod | 不涉及 | 通过 | 退出码 0 |
+| `mvn -B -ntp test` | Agent Pod 单元 / 切片测试 | 替身只用于纯逻辑（仓库、服务、口令校验、限流），不作为功能证据 | 通过 | `Tests run: 108, Failures: 0, Errors: 0, Skipped: 0` |
+| `mvn -B -ntp verify -Pintegration -DskipUnitTests=true` | Agent Pod Failsafe | 真实 `ticket-db` dev 实例 | 通过 | `Tests run: 47, Failures: 0, Errors: 0, Skipped: 0`；其中 `InitialAdminSetupIT` 8 个、`LegacyAdminLoginIT` 2 个、`DataRetentionIT` 1 个、`MigrationIT` 5 个 |
+| `bash -n .ai-delivery/features/001-v1/runtime/developer-functional-run.sh` | Agent Pod | 不涉及 | 通过 | `syntax-ok` |
+| `bash -euo pipefail .ai-delivery/features/001-v1/runtime/developer-functional-run.sh < /dev/null` | Agent Pod localhost:8080（`public`）/ 8081（一次性 schema）+ Chromium | 真实 `ticket-db` dev 实例 | 通过（退出码 0） | 运行前缀 `e2e-1794893679-b05630-`，一次性 schema `e2e_setup_e2e_1794893679_b05630`；两个实例都返回 `{"status":"UP"}`；`18 passed (1.7m)`（种子、IQA-016 情形①、IQA-001～IQA-014、删除一次性 schema、按前缀清理）；保底清理 2 项通过 |
+| Node `pg` + `@azure/identity` 只读核对（执行后） | Agent Pod | 真实 `ticket-db` dev 实例 | 通过 | `db_create=true`；`it_setup_%` / `e2e_setup_%` schema 残留 0；`it-%` / `e2e-%` 前缀账号残留 0 |
+
+测试中的密码与设置口令都是运行时随机生成的合成值，只存在于进程内存或环境中，没有写入仓库、日志或本报告。开发者测试不读取任何 `AIDH_SECRET_*`。
+
+### 使用模拟服务的验证
+
+不涉及：所有依赖都使用真实实例。`docs/dependencies.json` 中唯一的依赖 `ticket-db` 的 `realInstance.dev` 为 true，集成测试与功能测试都连接真实 dev 实例，没有数据库替身或模拟服务。
+
+### Runtime 与下游门禁就绪制品
+
+- `Dockerfile`：未改动（多阶段构建，`USER 10001`，`EXPOSE 8080`）。
+- `runtime/deployment.json`：未改动；`containerPort` 8080、`healthPath` `/actuator/health`、`candidateIdentityPath` `/api/candidate-identity`、`requiresPrivateNetwork` false；`developerValidationCommands` 五个类别在本次按顺序实际执行，全部通过。
+- Candidate identity endpoint：未改动，只返回平台注入的 `AIDELIVERY_DELIVERY_ID` 与 `AIDELIVERY_CANDIDATE_SHA`，没有回退值。
+- `runtime/developer-functional-run.sh`：未改动；`bash -n` 通过，在 `bash -euo pipefail`、stdin 为 `/dev/null` 的条件下完整执行通过。
+
+### 延后平台证据
+
+- 候选验证：Runner 以 Agent 身份在 dev 实例上执行 `deployment.json` 命令序列；ACR 镜像构建；候选部署后的 health 与 candidate-identity 校验。
+- Independent QA：IQA-001～IQA-016（IQA-016 情形①/② 使用 `test` 环境的 `AIDH_SECRET_INITIAL_ADMIN_*` 与 `AIDH_SECRET_INITIAL_SETUP_TOKEN`）；之后是 UAT、审批与合并。
+
+### 剩余风险
+
+- 候选验证 Runner 需要与本次 Agent 身份相同的建 schema 权限。本次实测 Agent 身份 `db_create=true`；如果 Runner 身份的权限不同，`integrationTests` 与 `functionalTests` 会因建 schema 失败而失败，失败原因会明确报告，不会被跳过。
+- 共享 dev 库的 `public` schema 中目前没有带凭据的管理员，所以 8080 实例的登录页会显示 `setup-link`（符合预期）。IQA-001～IQA-014 的断言只针对本次运行前缀创建的数据，不受影响。
+- 设置失败限流按来源地址保存在单个实例的内存中（TD-019），多副本部署时各副本分别计数；V1 单副本部署下与设计一致。
+
+### 实施结论
+
+完成。上一 Session 受阻的 6 项任务（T021、T065、T066、T067、T068、T059）在 schema 权限放开后，在真实 `ticket-db` dev 实例上完整验证通过，本次全部勾选。静态检查、构建、108 个单元 / 切片测试、47 个集成测试，以及 18 项浏览器功能测试（含 IQA-016 情形①）都在本 Session 实际执行并通过，执行后数据库没有遗留测试数据或一次性 schema。`tasks-implementation.md` 中全部任务都已完成。
