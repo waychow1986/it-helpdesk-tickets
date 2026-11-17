@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261116-72F2B9041E74-0071",
+  "stage": "specification.gate",
+  "outcome": "passed",
+  "summary": "复检通过：SG-069-001 已解决，行为模型 US-001、异常与恢复、凭据安全行为、开发者验证、Independent QA 验收与账号来源、依赖等章节均已与 FR-031 的一次性设置口令要求同步，本轮改动未引入新的阻塞问题。",
+  "artifacts": [],
+  "findings": []
+}
