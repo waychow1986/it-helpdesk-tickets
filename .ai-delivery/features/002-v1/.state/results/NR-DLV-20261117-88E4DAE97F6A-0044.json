@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261117-88E4DAE97F6A-0044",
+  "stage": "qa.plan",
+  "outcome": "passed",
+  "summary": "已修订 IQA-010 的跨阶段状态交接：阶段 1 写入 QA_STATE_DIR 并校验，同时在 test 库 QA 自有 schema 中保存不含机密的备份；阶段 2 递归查找状态文件，找不到时回退到库内备份，并记录状态来源与目录清单证据。已对已部署候选试运行两次两阶段：一次清空状态目录走库内备份回退，一次恢复状态文件并带模拟重新部署证据，全部场景都能如实判定，计划可锁定。",
+  "artifacts": [
+    { "path": ".ai-delivery/features/002-v1/tasks-qa.md" },
+    { "path": ".ai-delivery/features/002-v1/runtime/qa-run.sh" }
+  ]
+}
