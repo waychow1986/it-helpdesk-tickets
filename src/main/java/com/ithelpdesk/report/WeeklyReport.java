@@ -2,9 +2,12 @@ package com.ithelpdesk.report;
 
 import java.util.List;
 
-/** 周报表四项指标（FR-026～FR-028）。averageSeconds 为 null 表示无数据。 */
+/**
+ * 周报表：V1 四项指标（V1 FR-026～FR-028）+ V2 第五项“本周超时解决的工单数量”（FR-017、TD-028）。
+ * averageSeconds 为 null 表示无数据。
+ */
 public record WeeklyReport(WeekRange week, List<CategoryCount> categories, List<StaffCount> staff,
-                           long unassignedResolved, Double averageSeconds, long backlog) {
+                           long unassignedResolved, Double averageSeconds, long backlog, long overdueResolved) {
 
     /** 每个类别的工单数量（本周提交）。 */
     public record CategoryCount(long categoryId, String name, boolean active, long count) {

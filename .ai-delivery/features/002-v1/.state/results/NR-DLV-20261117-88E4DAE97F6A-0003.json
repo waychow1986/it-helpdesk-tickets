@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261117-88E4DAE97F6A-0003",
+  "stage": "intent",
+  "outcome": "passed",
+  "summary": "已按人工澄清答案将 BQ-001/002/003 记为已解决并在 intent.md 全文一致应用，当前无阻塞业务问题。",
+  "artifacts": [
+    { "path": ".ai-delivery/features/002-v1/intent.md" }
+  ]
+}

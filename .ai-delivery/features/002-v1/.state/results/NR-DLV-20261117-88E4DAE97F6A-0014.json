@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261117-88E4DAE97F6A-0014",
+  "stage": "technical-solution",
+  "outcome": "upstream_exception",
+  "summary": "已按人工澄清答案 HT-DLV-20261117-88E4DAE97F6A-0005（DEC-TS-V2-001 选 A 及两点补充）修订 design.md（新增 TD-034、更新治理约束、TD-030 理由、迁移策略、数据契约、验证矩阵 IQA-009/IQA-010 行与开放决策），docs/dependencies.json 无需改动；该答案要求修订 spec 的 IQA-009、IQA-010 与测试策略，须回退 specification 执行。",
+  "artifacts": [
+    { "path": ".ai-delivery/features/002-v1/design.md" }
+  ],
+  "upstream": {
+    "targetNodeId": "specification",
+    "reasonType": "infeasible",
+    "evidence": "spec.md IQA-009 前置条件要求“测试环境先部署 V1，并在 V1 中准备合成数据集……作为升级前快照”，操作为“将该环境升级为 V2 候选版本”；IQA-010 操作为“对该环境再次执行升级到同一 V2 候选版本”；测试策略写明“IQA-009、IQA-010 依赖测试环境能够先部署 V1、再升级为 V2 候选版本并再次执行升级”，假设中列有“测试环境能够部署 V1 并升级到 V2 候选版本”。平台 Independent QA 只能针对已部署的候选执行，不能部署 V1。人工澄清答案 HT-DLV-20261117-88E4DAE97F6A-0005 已决定选 A 并明确要求“规格中 IQA-009/010 与测试策略按此修订”：(1) IQA-009 的升级前数据基线改用 V1 交付 Independent QA 留下的 IQA-015 deferred baseline（test 库前缀 q15-72f2b9041e74-），QA 在候选环境逐项核对基线中的账号、类别、工单、沟通与处理记录仍然存在且内容未变，而不只是检查不变量；(2) 平台受控重新部署能力可用时，IQA-010 的再次升级改为由 QA 计划声明在 IQA-010 之前重新部署同一候选，并对比重新部署前后的数据与迁移历史；完整的“V1→快照→升级→再次升级→中断重跑”由开发者升级演练在真实 dev 实例上执行；“部署 V1”不作要求。design.md 已按此落实（TD-030、TD-034、验证环境责任矩阵 IQA-009/IQA-010 行），spec 修订后设计无需再改。",
+    "changesApprovedIntent": false
+  }
+}

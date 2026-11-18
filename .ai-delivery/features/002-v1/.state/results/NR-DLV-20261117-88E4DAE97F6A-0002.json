@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261117-88E4DAE97F6A-0002",
+  "stage": "intent",
+  "outcome": "needs_decision",
+  "summary": "已完成 V2 业务意图 intent.md（INT-001～INT-015），期望解决时间换算、超时解决统计口径和停用 IT 同事名下未解决工单处理三项业务问题待人工决定。",
+  "artifacts": [
+    { "path": ".ai-delivery/features/002-v1/intent.md" }
+  ],
+  "decisionsNeeded": [
+    {
+      "id": "BQ-001",
+      "level": "business",
+      "question": "“中 1 个工作日、低 3 个工作日”在“按自然时间计算”下如何换算为期望解决时间？",
+      "affects": ["INT-005", "INT-007", "INT-008", "INT-013"],
+      "options": [
+        { "key": "A", "label": "1 个工作日按 24 小时、3 个工作日按 72 小时计算，自提交时刻起算，不扣除夜间、周末和节假日", "recommended": true, "rationale": "与 request“按自然时间计算即可”及 V1“超过 3 天未解决”按 72 小时的口径一致" },
+        { "key": "B", "label": "1 个工作日按 8 小时、3 个工作日按 24 小时计算，均为自提交起的自然时间", "recommended": false },
+        { "key": "C", "label": "按工作日日历计算（跳过周末，落在下一个或第三个工作日的同一时刻）", "recommended": false }
+      ]
+    },
+    {
+      "id": "BQ-002",
+      "level": "business",
+      "question": "周报表中“本周超时解决的工单数量”如何统计？",
+      "affects": ["INT-013"],
+      "options": [
+        { "key": "A", "label": "统计本周内首次被标记为已解决、且首次已解决时刻晚于期望解决时间的工单数量", "recommended": true, "rationale": "与 V1 报表“首次标记为已解决”的口径一致" },
+        { "key": "B", "label": "统计本周内被标记为已解决（含再次标记）且该时刻晚于期望解决时间的工单，同一工单本周只计一次", "recommended": false },
+        { "key": "C", "label": "在 A 的基础上，被改为已关闭且关闭时刻晚于期望解决时间的工单也计为超时解决", "recommended": false }
+      ]
+    },
+    {
+      "id": "BQ-003",
+      "level": "business",
+      "question": "停用一位 IT 同事时，其名下仍未解决的工单如何处理？",
+      "affects": ["INT-011", "INT-012"],
+      "options": [
+        { "key": "A", "label": "工单保持原样，仍显示该同事为处理人，由其他 IT 同事重新认领或分派", "recommended": true, "rationale": "与 V1 取消 IT 同事身份时的处理一致" },
+        { "key": "B", "label": "停用时其名下未解决工单自动变为未分配，处理记录保留原处理人信息", "recommended": false },
+        { "key": "C", "label": "其名下仍有未解决工单时不允许停用，须先转给其他 IT 同事", "recommended": false }
+      ]
+    }
+  ]
+}

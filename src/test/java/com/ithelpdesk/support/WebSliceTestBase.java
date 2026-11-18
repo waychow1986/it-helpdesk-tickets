@@ -8,6 +8,7 @@ import com.ithelpdesk.category.CategoryService;
 import com.ithelpdesk.report.WeeklyReportService;
 import com.ithelpdesk.ticket.TicketCommandService;
 import com.ithelpdesk.ticket.TicketQueryService;
+import com.ithelpdesk.user.AccountStatusService;
 import com.ithelpdesk.user.AppUser;
 import com.ithelpdesk.user.InitialAdminSetupService;
 import com.ithelpdesk.user.Role;
@@ -35,6 +36,9 @@ public abstract class WebSliceTestBase {
 
     @MockitoBean
     protected UserAdminService userAdminService;
+
+    @MockitoBean
+    protected AccountStatusService accountStatusService;
 
     @MockitoBean
     protected CategoryService categoryService;

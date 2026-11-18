@@ -34,6 +34,6 @@ public class WeeklyReportService {
         WeekRange week = WeekRange.containing(now, properties.zoneId());
         return new WeeklyReport(week, repository.categoryCounts(week), repository.staffCounts(week),
             repository.unassignedResolved(week), repository.averageResolutionSeconds(week),
-            repository.backlog(now.minus(BACKLOG_AGE)));
+            repository.backlog(now.minus(BACKLOG_AGE)), repository.overdueResolvedCount(week));
     }
 }

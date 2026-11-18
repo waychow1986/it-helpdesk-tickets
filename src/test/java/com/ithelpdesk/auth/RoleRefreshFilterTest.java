@@ -90,4 +90,37 @@ class RoleRefreshFilterTest {
         filter.doFilter(new MockHttpServletRequest("GET", "/login"), new MockHttpServletResponse(), chain);
         assertThat(chain.getRequest()).isNotNull();
     }
+
+    @Test
+    void deactivatedAccountIsLoggedOutOnGetAndPost() throws Exception {
+        for (String method : new String[] {"GET", "POST"}) {
+            login(new CurrentUser(10, "off", "用户", Role.IT_STAFF, "x"));
+            when(users.findById(10)).thenReturn(Optional.of(
+                new AppUser(10, "off", "hash", "用户", Role.IT_STAFF, Instant.EPOCH, null, false)));
+            MockHttpServletRequest request = new MockHttpServletRequest(method, "/tickets/5/status");
+            MockHttpSession session = new MockHttpSession();
+            request.setSession(session);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            MockFilterChain chain = new MockFilterChain();
+            filter.doFilter(request, response, chain);
+
+            assertThat(session.isInvalid()).as(method).isTrue();
+            assertThat(response.getStatus()).as(method).isEqualTo(302);
+            assertThat(response.getRedirectedUrl()).as(method).isEqualTo("/login");
+            assertThat(chain.getRequest()).as(method).isNull();
+            assertThat(SecurityContextHolder.getContext().getAuthentication()).as(method).isNull();
+        }
+    }
+
+    @Test
+    void activeAccountRefreshUnchanged() throws Exception {
+        CurrentUser user = new CurrentUser(11, "on", "用户", Role.EMPLOYEE, "x");
+        login(user);
+        when(users.findById(11)).thenReturn(Optional.of(
+            new AppUser(11, "on", "hash", "用户", Role.EMPLOYEE, Instant.EPOCH, null, true)));
+        MockFilterChain chain = new MockFilterChain();
+        filter.doFilter(new MockHttpServletRequest("POST", "/tickets"), new MockHttpServletResponse(), chain);
+        assertThat(chain.getRequest()).isNotNull();
+        assertThat(SecurityContextHolder.getContext().getAuthentication().getPrincipal()).isSameAs(user);
+    }
 }

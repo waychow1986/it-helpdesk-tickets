@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261117-88E4DAE97F6A-0013",
+  "stage": "technical-solution",
+  "outcome": "needs_decision",
+  "summary": "已完成 V2 技术方案 design.md（TD-020～TD-033：期望解决时间读时派生、账号 active 列与停用/启用、最后可用管理员保护、报表第五项、只加一列的可重复升级与真实 dev 库升级演练）并更新 docs/dependencies.json；IQA-009/IQA-010 因平台 Independent QA 无法部署 V1 或重新部署候选，其候选环境执行方式需人工决定（DEC-TS-V2-001）。",
+  "artifacts": [
+    {
+      "path": ".ai-delivery/features/002-v1/design.md"
+    },
+    {
+      "path": "docs/dependencies.json"
+    }
+  ],
+  "decisionsNeeded": [
+    {
+      "id": "DEC-TS-V2-001",
+      "level": "technical",
+      "question": "spec 要求 Independent QA 执行 IQA-009/IQA-010（测试环境先部署 V1 并准备数据快照、再升级为 V2 候选、再次执行升级），并写明具体执行方式由技术方案决定；但平台的 Independent QA 只能针对已部署的候选执行，不能部署 V1 或重新部署候选，候选首次部署到 test 库时即已完成真实的 V1→V2 升级。IQA-009/IQA-010 在候选环境中应如何执行？",
+      "affects": [
+        "IQA-009",
+        "IQA-010",
+        "AC-013",
+        "AC-014",
+        "AC-015",
+        "AC-016",
+        "FR-019",
+        "FR-023",
+        "NFR-001",
+        "TD-030"
+      ],
+      "options": [
+        {
+          "key": "A",
+          "label": "完整的“V1 结构与数据集→快照→升级→再次升级→中断后重跑”由开发者升级演练在真实 dev PostgreSQL 上执行（候选验证对每个候选必跑，含浏览器原凭据核对）；Independent QA 在候选环境对 test 库实际完成的升级做只读核对与黑盒验证（迁移历史版本 2 只成功执行一次、V1 时期初始管理员原凭据登录且为启用、全部账号启用、既有工单期望解决时间与超时标识、报表四项与独立 SQL 一致、设置入口不可用），不声称执行了“部署 V1”和“再次升级”；spec IQA-009/IQA-010 与测试策略按此修订",
+          "recommended": true,
+          "rationale": "在平台现有能力内同时给出真实升级演练证据与候选环境真实升级结果核对，不使用替身，也不需要产品测试后门"
+        },
+        {
+          "key": "B",
+          "label": "保持 IQA-009/IQA-010 由 Independent QA 按原文执行，需要平台提供在 QA 控制下部署 V1、再部署并重复部署 V2 候选的能力；在获得该能力前 QA 将记录测试缺口，整体 QA 无法通过",
+          "recommended": false,
+          "rationale": "与 spec 原文一致，但依赖当前平台运行环境画像未提供的能力"
+        },
+        {
+          "key": "C",
+          "label": "与 V1 QD-001 处理一致：本迭代 Independent QA 不执行 IQA-009/IQA-010，升级验证只以开发者升级演练为证据，线上真实升级结果留作发布阶段平台证据；spec 相应修订",
+          "recommended": false,
+          "rationale": "最简单，但候选环境中的真实升级结果不经独立 QA 核对"
+        }
+      ]
+    }
+  ]
+}

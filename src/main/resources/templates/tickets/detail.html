@@ -3,16 +3,18 @@
 <head th:replace="~{layout :: head('工单 #' + ${ticket.id})}"></head>
 <body>
 <header th:replace="~{layout :: nav}"></header>
-<main>
+<main data-testid="ticket-detail" th:attr="data-overdue=${detail.overdue}">
   <h1><span data-testid="ticket-id" th:text="'#' + ${ticket.id}">#1</span> <span data-testid="detail-title" th:text="${ticket.title}">标题</span></h1>
   <div th:replace="~{layout :: flash}"></div>
   <dl class="info">
-    <dt>状态</dt><dd data-testid="ticket-status" th:text="${ticket.status.label}">待处理</dd>
+    <dt>状态</dt><dd><span data-testid="ticket-status" th:text="${ticket.status.label}">待处理</span>
+      <span th:if="${detail.overdue}" class="overdue" data-testid="ticket-overdue">已超时</span></dd>
     <dt>处理人</dt><dd data-testid="ticket-assignee" th:text="${ticket.assigneeLabel()}">未分配</dd>
     <dt>类别</dt><dd data-testid="detail-category" th:text="${ticket.categoryLabel()}">类别</dd>
     <dt>紧急程度</dt><dd data-testid="detail-urgency" th:text="${ticket.urgency.label}">中</dd>
     <dt>提交人</dt><dd data-testid="detail-submitter" th:text="${ticket.submitterName}">提交人</dd>
     <dt>提交时间</dt><dd data-testid="detail-submitted" th:text="${@timeFormat.format(ticket.submittedAt)}">时间</dd>
+    <dt>期望解决时间</dt><dd data-testid="ticket-expected" th:attr="data-expected-at=${ticket.expectedResolveAtIso()}" th:text="${@timeFormat.format(ticket.expectedResolveAt)}">时间</dd>
   </dl>
   <h2>问题描述</h2>
   <p class="pre" data-testid="detail-description" th:text="${ticket.description}">描述</p>

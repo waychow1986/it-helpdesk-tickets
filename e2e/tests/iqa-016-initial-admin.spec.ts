@@ -34,7 +34,9 @@ async function expectNoSecretEcho(page: Page, secrets: string[]): Promise<void> 
 
 test('一次性设置初始管理员：口令缺失或错误被拒、设置成功后永久关闭且不能新增或接管账号', async ({ page, run }) => {
   const token = SETUP_TOKEN();
-  const admin = { login: run.name('root'), password: randomPassword(), display: run.name('初始管理员') };
+  // 密码取自运行时随机值（只在进程环境），供同一 schema 上随后执行的 V2 IQA-006 以 A1 登录
+  const admin = { login: run.name('root'), password: process.env.E2E_SETUP_ADMIN_PASSWORD ?? randomPassword(),
+    display: run.name('初始管理员') };
   const secrets = [token, admin.password];
   expect(await setupSchemaUserCount(SCHEMA())).toBe(0);
 

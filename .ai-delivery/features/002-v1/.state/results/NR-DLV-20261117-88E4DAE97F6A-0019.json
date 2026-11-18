@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261117-88E4DAE97F6A-0019",
+  "stage": "technical-solution",
+  "outcome": "passed",
+  "summary": "按已批准的 spec 修订（IQA-009/IQA-010/测试策略/依赖假设）只更新 design.md 受影响条目：治理与技术约束中 IQA-009/010 行、TD-030（原前置条件口径与演练记录作为 IQA-010 证据）、验证矩阵 Independent QA IQA-010 行（快照含 V1 基线、未重新部署时如实说明）、开放决策中关于回退 spec 的说明；docs/dependencies.json 无需改动。",
+  "artifacts": [
+    { "path": ".ai-delivery/features/002-v1/design.md" }
+  ]
+}

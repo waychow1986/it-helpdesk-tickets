@@ -1,0 +1,28 @@
+{
+  "containerPort": 8080,
+  "healthPath": "/actuator/health",
+  "candidateIdentityPath": "/api/candidate-identity",
+  "requiresPrivateNetwork": false,
+  "developerSetupCommands": [
+    "mvn -B -ntp -q dependency:go-offline",
+    "cd e2e && npm ci"
+  ],
+  "developerValidationCommands": {
+    "staticAnalysis": [
+      "mvn -B -ntp checkstyle:check"
+    ],
+    "build": [
+      "mvn -B -ntp -DskipTests package"
+    ],
+    "developerTests": [
+      "mvn -B -ntp test"
+    ],
+    "integrationTests": [
+      "mvn -B -ntp verify -Pintegration -DskipUnitTests=true"
+    ],
+    "functionalTests": [
+      "bash .ai-delivery/features/002-v1/runtime/developer-functional-run.sh"
+    ]
+  },
+  "developerFunctionalTestScript": ".ai-delivery/features/002-v1/runtime/developer-functional-run.sh"
+}

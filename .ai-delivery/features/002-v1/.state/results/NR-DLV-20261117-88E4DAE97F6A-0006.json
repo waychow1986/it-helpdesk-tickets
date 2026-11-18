@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261117-88E4DAE97F6A-0006",
+  "stage": "intent",
+  "outcome": "passed",
+  "summary": "按人工审批意见新增 INT-016（系统始终至少保留一个可用管理员，停用最后一个可用管理员时拒绝并提示原因），同步补充业务约束并从风险中移除对应条目，其余内容未改动。",
+  "artifacts": [
+    { "path": ".ai-delivery/features/002-v1/intent.md" }
+  ]
+}

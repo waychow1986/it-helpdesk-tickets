@@ -38,6 +38,9 @@
 
   <h2>超过 3 天未解决的工单数</h2>
   <p>待处理或处理中、且自提交起超过 72 小时：<strong data-testid="report-backlog" th:text="${report.backlog()}">0</strong></p>
+
+  <h2>本周超时解决的工单数量</h2>
+  <p>首次标记为已解决的时刻在本周内、且晚于期望解决时间：<strong data-testid="report-overdue-resolved" th:text="${report.overdueResolved()}">0</strong></p>
 </main>
 </body>
 </html>

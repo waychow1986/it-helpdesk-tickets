@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "nodeRunId": "NR-DLV-20261117-88E4DAE97F6A-0010",
+  "stage": "specification.gate",
+  "outcome": "passed",
+  "summary": "spec.md 完整、内部一致且可验收，US/FR/NFR/AC/IQA 均有 direct、closure、governance 或人工澄清来源，忠实派生自已批准 Intent（INT-001～INT-016 及 BQ-001～003 人工答案、人工审批意见），未发现阻塞问题。",
+  "artifacts": [],
+  "findings": []
+}
